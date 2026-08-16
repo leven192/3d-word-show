@@ -1,0 +1,25 @@
+# Vercel 部署时忽略的本地开发/辅助文件
+# 注意：lib/ 和 model-embedded.js 必须部署（页面依赖它们），不要忽略
+
+# PowerShell 脚本
+*.ps1
+# 批处理
+*.bat
+# VBS
+*.vbs
+# 日志
+*.log
+# 文本说明/记录
+*.txt
+# coscli 工具
+coscli.exe
+# 备份的旧版页面
+index-full.html
+# 本地隧道相关文件（Vercel 上无意义）
+share-config.js
+current-url.txt
+tunnel-status.txt
+cpolar-tunnel.log
+cpolar-autostart.log
+# 本地发布包（根目录即为部署内容，发布/ 是给 COS 用的）
+发布/
