@@ -48,7 +48,16 @@
       transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .45s;
     }
     #detail-panel.show { transform: translateX(0); opacity: 1; pointer-events: auto; }
+    /* 收起状态：面板滑出屏幕（模型不被遮挡） */
+    #detail-panel.collapsed { transform: translateX(120%); opacity: 0; pointer-events: none; }
+    #detail-panel .dp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     #detail-panel .dp-name { font-size: 19px; font-weight: 700; }
+    #dp-collapse {
+      background: rgba(255,255,255,.08); color: #aab4c8; border: 1px solid rgba(255,255,255,.12);
+      border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; line-height: 1;
+      flex: none; transition: background .2s, color .2s;
+    }
+    #dp-collapse:hover { background: rgba(255,255,255,.16); color: #fff; }
     #detail-panel .dp-desc  { color: rgba(232,236,244,.6); font-size: 12px; margin: 6px 0 14px; line-height: 1.6; }
     #detail-panel table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
     #detail-panel td { font-size: 12.5px; padding: 6px 2px; border-bottom: 1px solid rgba(255,255,255,.07); }
@@ -58,6 +67,17 @@
     #detail-panel .dp-status.ok  { color: #5fd08a; }
     #detail-panel .dp-status.err { color: #ff7a7a; }
     #detail-panel .dp-status.loading { color: #ffc46b; }
+    /* 收起后的迷你标签条（点击展开） */
+    #dp-mini {
+      position: fixed; top: 16px; right: 16px; z-index: 12;
+      background: rgba(61,108,255,.9); color: #fff;
+      border-radius: 18px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+      cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      transition: background .2s, transform .15s;
+    }
+    #dp-mini:hover { background: #2f58d6; }
+    #dp-mini:active { transform: scale(.95); }
+    #dp-mini.hidden { display: none; }
     #back-btn {
       width: 100%; padding: 10px; border: none; border-radius: 9px; cursor: pointer;
       background: linear-gradient(90deg, #2e5bff, #5a3dff); color: #fff; font-size: 14px; font-weight: 600;
@@ -68,6 +88,8 @@
     @media (max-width: 768px) {
       #detail-panel { top: auto; bottom: 116px; right: 10px; left: 10px; width: auto; transform: translateY(16px); }
       #detail-panel.show { transform: translateY(0); }
+      #detail-panel.collapsed { transform: translateY(130%); }
+      #dp-mini { top: auto; bottom: 116px; }
     }
 
     /* ========== 设备列表（桌面左侧栏 / 手机底部横条） ========== */
@@ -173,12 +195,16 @@
   </div>
 
   <div id="detail-panel">
-    <div class="dp-name"></div>
+    <div class="dp-head">
+      <div class="dp-name"></div>
+      <button id="dp-collapse" title="收起面板（看模型）">—</button>
+    </div>
     <div class="dp-desc"></div>
     <table class="dp-params"></table>
     <div class="dp-status"></div>
     <button id="back-btn">← 返回全景</button>
   </div>
+  <div id="dp-mini" class="hidden">📋 设备参数</div>
 
   <button id="share-btn">分享 / 二维码</button>
 
@@ -491,6 +517,20 @@
     const panelDesc = panel.querySelector('.dp-desc');
     const panelParams = panel.querySelector('.dp-params');
     const panelStatus = panel.querySelector('.dp-status');
+    const dpMini = document.getElementById('dp-mini');
+    // 面板折叠：收起后只留迷你标签条，不遮挡模型
+    function collapsePanel() {
+      panel.classList.add('collapsed');
+      panel.classList.remove('show');
+      dpMini.classList.remove('hidden');
+    }
+    function expandPanel() {
+      panel.classList.remove('collapsed');
+      panel.classList.add('show');
+      dpMini.classList.add('hidden');
+    }
+    document.getElementById('dp-collapse').addEventListener('click', collapsePanel);
+    dpMini.addEventListener('click', expandPanel);
     function setStatus(text, cls) {
       panelStatus.textContent = text;
       panelStatus.className = 'dp-status' + (cls ? ' ' + cls : '');
@@ -510,9 +550,12 @@
         });
       }
       setStatus('正在加载模型…', 'loading');
-      panel.classList.add('show');
+      expandPanel();   // 进入新设备时确保面板展开
     }
-    function closePanel() { panel.classList.remove('show'); }
+    function closePanel() {
+      panel.classList.remove('show', 'collapsed');
+      dpMini.classList.add('hidden');
+    }
     function esc(s) {
       return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -630,22 +673,34 @@
       console.log('[下钻系统] 返回全景模式');
     }
 
-    // 特写取景：根据高模包围球微调相机距离
+    // 特写取景：①模型居中（旋转中心=模型中心，触控流畅的关键）
+    //          ②相机/目标点同步平移 + 距离适配
     function fitDetailView(obj) {
       const box = new THREE.Box3().setFromObject(obj);
       if (box.isEmpty()) return;
+      const center = box.getCenter(new THREE.Vector3());
+      // 1) 模型居中：把包围盒中心平移到 (0, 0.3, 0)，让旋转轴对准模型中心
+      obj.position.add(new THREE.Vector3(-center.x, 0.3 - center.y, -center.z));
+      box.setFromObject(obj);
       const r = box.getBoundingSphere(new THREE.Sphere()).radius;
       const want = Math.max(r / Math.tan((camera.fov * Math.PI) / 360) * 1.15, r * 2);
-      const cur = camera.position.distanceTo(controls.target);
+      // 2) 目标点归位到模型中心，相机同步平移保持相对位置
+      const oldT = controls.target.clone();
+      controls.target.set(0, 0.3, 0);
+      camera.position.add(controls.target.clone().sub(oldT));
+      // 3) 距离适配
+      const dir = camera.position.clone().sub(controls.target);
+      const cur = dir.length();
       if (Math.abs(want - cur) > 0.05) {
-        const dir = camera.position.clone().sub(controls.target).normalize();
-        const pos = controls.target.clone().addScaledVector(dir, want);
-        camera.position.copy(pos);
-        camera.near = Math.max(0.01, r * 0.001);
-        camera.far = Math.max(100, want * 10);
-        camera.updateProjectionMatrix();
-        controls.update();
+        dir.normalize().multiplyScalar(want);
+        camera.position.copy(controls.target).add(dir);
       }
+      camera.near = Math.max(0.01, r * 0.001);
+      camera.far = Math.max(100, want * 10);
+      camera.updateProjectionMatrix();
+      controls.minDistance = r * 0.1;
+      controls.maxDistance = r * 20;
+      controls.update();
     }
 
     /* ================= 点击拾取（Raycaster → instanceId） ================= */
