@@ -36,20 +36,20 @@
     }
     #hint.hidden { opacity: 0; transform: translateX(-50%) translateY(-8px); }
 
-    /* ========== 详情参数面板 ========== */
+    /* ========== 详情参数面板（左下角，避开右上角 lil-gui 控制面板） ========== */
     #detail-panel {
       position: fixed; z-index: 12;
-      top: 16px; right: 16px; width: 300px;
+      left: 16px; bottom: 16px; width: 300px;
       background: rgba(16,20,30,.88); backdrop-filter: blur(10px);
       border: 1px solid rgba(255,255,255,.12); border-radius: 14px;
       padding: 18px; color: #e8ecf4;
       box-shadow: 0 12px 40px rgba(0,0,0,.5);
-      transform: translateX(24px); opacity: 0; pointer-events: none;
+      transform: translateX(-24px); opacity: 0; pointer-events: none;
       transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .45s;
     }
     #detail-panel.show { transform: translateX(0); opacity: 1; pointer-events: auto; }
     /* 收起状态：面板滑出屏幕（模型不被遮挡） */
-    #detail-panel.collapsed { transform: translateX(120%); opacity: 0; pointer-events: none; }
+    #detail-panel.collapsed { transform: translateX(-130%); opacity: 0; pointer-events: none; }
     #detail-panel .dp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     #detail-panel .dp-name { font-size: 19px; font-weight: 700; }
     #dp-collapse {
@@ -67,9 +67,9 @@
     #detail-panel .dp-status.ok  { color: #5fd08a; }
     #detail-panel .dp-status.err { color: #ff7a7a; }
     #detail-panel .dp-status.loading { color: #ffc46b; }
-    /* 收起后的迷你标签条（点击展开） */
+    /* 收起后的迷你标签条（点击展开，位于左下角与面板同位置） */
     #dp-mini {
-      position: fixed; top: 16px; right: 16px; z-index: 12;
+      position: fixed; left: 16px; bottom: 16px; z-index: 12;
       background: rgba(61,108,255,.9); color: #fff;
       border-radius: 18px; padding: 8px 16px; font-size: 13px; font-weight: 600;
       cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.4);
@@ -86,10 +86,17 @@
     #back-btn:hover { filter: brightness(1.15); }
     #back-btn:active { transform: scale(.97); }
     @media (max-width: 768px) {
-      #detail-panel { top: auto; bottom: 116px; right: 10px; left: 10px; width: auto; transform: translateY(16px); }
+      #detail-panel { top: auto; bottom: 12px; right: 10px; left: 10px; width: auto; transform: translateY(16px); }
       #detail-panel.show { transform: translateY(0); }
       #detail-panel.collapsed { transform: translateY(130%); }
-      #dp-mini { top: auto; bottom: 116px; }
+      #dp-mini { top: auto; left: 50%; bottom: 12px; transform: translateX(-50%); }
+    }
+    /* 详情模式：侧栏滑出隐藏（面板放左下角不被遮挡），分享按钮隐藏 */
+    #device-panel { transition: transform .45s cubic-bezier(.2,.8,.2,1); }
+    body.in-detail #device-panel { transform: translateX(-100%); }
+    body.in-detail #share-btn { opacity: 0; pointer-events: none; }
+    @media (max-width: 768px) {
+      body.in-detail #device-panel { transform: translateY(100%); }
     }
 
     /* ========== 设备列表（桌面左侧栏 / 手机底部横条） ========== */
@@ -640,6 +647,7 @@
       setLoading(false);
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.DETAIL;
+      document.body.classList.add('in-detail');   // 隐藏侧栏/分享，面板独占左下角
       document.getElementById('hint').classList.add('hidden');
       console.log('[下钻系统] 进入详情模式:', device.name);
     }
@@ -669,6 +677,7 @@
       setLoading(false);
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.OVERVIEW;
+      document.body.classList.remove('in-detail');  // 恢复侧栏与分享按钮
       document.getElementById('hint').classList.remove('hidden');
       console.log('[下钻系统] 返回全景模式');
     }
