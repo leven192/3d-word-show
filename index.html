@@ -153,7 +153,7 @@
 
   <div id="loading-overlay">
     <div class="spinner"></div>
-    <div id="loading-text">加载中…</div>
+    <div id="loading-text">初始化中…</div>
     <div class="progress-wrap"><div id="progress-bar"></div></div>
   </div>
 
@@ -240,7 +240,12 @@
     /* ================= 双层渲染器 ================= */
     const app = document.getElementById('app');
     function makeRenderer(alpha, id) {
-      const r = new THREE.WebGLRenderer({ antialias: true, alpha });
+      let r;
+      try { r = new THREE.WebGLRenderer({ antialias: true, alpha }); }
+      catch (e1) {
+        try { r = new THREE.WebGLRenderer({ antialias: false, alpha }); }
+        catch (e2) { showFatal('WebGL 不可用'); throw e2; }
+      }
       r.setPixelRatio(Math.min(devicePixelRatio, 2));
       r.setSize(innerWidth, innerHeight);
       r.outputColorSpace = THREE.SRGBColorSpace;
@@ -271,7 +276,7 @@
 
     // 地面网格（虚化时同样变模糊，增强景深感）
     const grid = new THREE.GridHelper(16, 20, 0x3a4a6a, 0x232e44);
-    grid.position.y = 0;
+    grid.position.y = 0.01;   // 略高于地面，避免与地板 z-fight 闪烁
     sceneLow.add(grid);
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry(10, 64),
@@ -632,6 +637,9 @@
         if (!state.devices.length) { showFatal('models.json 中没有设备'); return; }
         renderSidebar();
         state.devices.forEach((d, i) => makeLabel(d.name, i));
+        // 全景低模已就绪（不依赖任何 GLB），隐藏加载遮罩
+        setLoading(false);
+        console.log('[下钻系统] 全景就绪，共 ' + state.devices.length + ' 台设备');
       } catch (e) {
         console.error(e);
         showFatal('models.json 加载失败：' + e.message);

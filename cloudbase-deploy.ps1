@@ -44,19 +44,30 @@ if ($LASTEXITCODE -ne 0 -or ($probe -match '无有效身份信息|请使用.*log
     }
 }
 
-# 3) 部署（发布/ 全量上传到静态托管根路径，忽略说明 txt）
+# 3) 部署（发布/ 全量上传，忽略说明 txt）
+#    目标1: 桶根目录 —— 对应默认域名 tcloudbaseapp.com
+#    目标2: naigukeji/发布 目录 —— 对应 webapps.tcloudbase.com 域名（用户访问的主链接）
 Write-Host "正在部署: $src" -ForegroundColor Cyan
 Write-Host "目标环境: $EnvId" -ForegroundColor Cyan
-& tcb hosting deploy $src -e $EnvId --ignore "*.txt" 2>&1 | ForEach-Object { Write-Output $_ }
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "部署失败（exit $LASTEXITCODE）。请检查：登录状态 / 环境 ID / 网络。" -ForegroundColor Red
-    if (-not $NoPrompt) { Read-Host "按回车退出" }
-    exit 1
+$deployTargets = @('', 'naigukeji/发布')
+foreach ($t in $deployTargets) {
+    if ($t) { Write-Host "部署到路径: $t" -ForegroundColor DarkGray }
+    if ($t) {
+        & tcb hosting deploy $src $t -e $EnvId --ignore "*.txt" 2>&1 | ForEach-Object { Write-Output $_ }
+    } else {
+        & tcb hosting deploy $src -e $EnvId --ignore "*.txt" 2>&1 | ForEach-Object { Write-Output $_ }
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "部署失败（exit $LASTEXITCODE）。请检查：登录状态 / 环境 ID / 网络。" -ForegroundColor Red
+        if (-not $NoPrompt) { Read-Host "按回车退出" }
+        exit 1
+    }
 }
 
 # 4) 结果
 Write-Host ""
 Write-Host "============== 部署完成 ===============" -ForegroundColor Green
-Write-Host "网站地址: $SiteUrl" -ForegroundColor Green
+Write-Host "网站地址(主链接): $SiteUrl" -ForegroundColor Green
+Write-Host "网站地址(备用):   https://baigukeji-d6g7omgxc78b09a62-1469467156.tcloudbaseapp.com/" -ForegroundColor DarkGray
 Write-Host "缓存: CDN 会在数分钟内自动刷新（无需手动操作）；急用可浏览器无痕模式验证" -ForegroundColor DarkGray
 if (-not $NoPrompt) { Read-Host "按回车退出" }
