@@ -42,6 +42,11 @@ $sources = @{
         'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js',
         'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js'
     )
+    'utils/BufferGeometryUtils.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/utils/BufferGeometryUtils.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js'
+    )
     'lil-gui.esm.min.js' = @(
         'https://registry.npmmirror.com/lil-gui/0.20.0/files/dist/lil-gui.esm.min.js',
         'https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js',
@@ -69,6 +74,7 @@ Write-Host "  下载 three.js / lil-gui 本地依赖（一次性）" -Foreground
 Write-Host "==============================================" -ForegroundColor Cyan
 
 $ok = $true
+New-Item -ItemType Directory -Path (Join-Path $libDir 'utils') -Force | Out-Null
 foreach ($name in $sources.Keys) {
     $out = Join-Path $libDir $name
     if (Test-Path $out) {
@@ -92,6 +98,23 @@ foreach ($f in @('OrbitControls.js', 'GLTFLoader.js')) {
         } else {
             Write-Host "警告: $f 中未找到 'three' 导入，格式可能不同" -ForegroundColor Yellow
         }
+        # GLTFLoader 依赖的 utils 相对路径修正
+        if ($content -match "from '../utils/BufferGeometryUtils.js';") {
+            $patched = $content -replace "from '../utils/BufferGeometryUtils.js';", "from './utils/BufferGeometryUtils.js';"
+            [System.IO.File]::WriteAllText($p, $patched, (New-Object System.Text.UTF8Encoding($false)))
+            Write-Host "已修补 $f ：utils 路径改为 ./utils/（本地兼容）" -ForegroundColor Green
+        }
+    }
+}
+# BufferGeometryUtils 的 'three' 导入修正（它在 lib/utils/ 下，相对 three 是上一级）
+$bfu = Join-Path $libDir 'utils\BufferGeometryUtils.js'
+if (Test-Path $bfu) {
+    $bc = [System.IO.File]::ReadAllText($bfu)
+    if ($bc -match "from 'three';") {
+        [System.IO.File]::WriteAllText($bfu, $bc -replace "from 'three';", "from '../three.module.js';", (New-Object System.Text.UTF8Encoding($false)))
+        Write-Host "已修补 utils/BufferGeometryUtils.js ：'three' 导入改为相对路径" -ForegroundColor Green
+    } elseif ($bc -match "from '../three.module.js';") {
+        Write-Host "utils/BufferGeometryUtils.js 已是相对路径导入（无需修补）" -ForegroundColor DarkGray
     }
 }
 

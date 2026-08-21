@@ -39,6 +39,12 @@ foreach ($f in @('three.module.js', 'OrbitControls.js', 'GLTFLoader.js', 'lil-gu
         }
     }
 }
+# lib/utils/（GLTFLoader 依赖的 BufferGeometryUtils 等）
+$libUtils = Join-Path $root 'lib\utils'
+if (Test-Path $libUtils) {
+    Copy-Item $libUtils (Join-Path $libDir 'utils') -Recurse -Force
+    Write-Host "已复制 lib\utils\"
+}
 
 # 3) 内嵌模型（从当前 model.glb 重新生成）
 $glb = Join-Path $root 'model.glb'

@@ -107,6 +107,37 @@
     #share-btn:hover { background: #3a4150; }
     @media (max-width: 768px) { #share-btn { bottom: 96px; } }
 
+    /* 分享面板（链接 + 二维码，微信扫码打开） */
+    #share-panel {
+      position: fixed; right: 14px; bottom: 52px; z-index: 16;
+      width: 240px;
+      background: rgba(16,20,30,.94); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.12); border-radius: 12px;
+      padding: 14px; color: #e8ecf4;
+      box-shadow: 0 10px 34px rgba(0,0,0,.5);
+      opacity: 0; transform: translateY(10px); pointer-events: none;
+      transition: opacity .3s, transform .3s;
+    }
+    #share-panel.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    #share-panel .sp-head { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+    #share-panel .sp-url-row { display: flex; gap: 6px; margin-bottom: 12px; }
+    #share-panel #share-url {
+      flex: 1; min-width: 0; background: rgba(255,255,255,.07); color: #cfe0ff;
+      border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
+      padding: 6px 8px; font-size: 11px; outline: none;
+    }
+    #share-panel #share-copy {
+      background: #3d6cff; color: #fff; border: none; border-radius: 6px;
+      padding: 6px 10px; cursor: pointer; font-size: 12px; white-space: nowrap;
+    }
+    #share-panel #share-copy:hover { background: #2f58d6; }
+    #share-panel .sp-qr-wrap { display: flex; justify-content: center; margin-bottom: 8px; }
+    #share-panel #share-qr { background: #fff; border-radius: 8px; width: 180px; height: 180px; }
+    #share-panel #share-note {
+      color: rgba(232,236,244,.6); font-size: 11px; line-height: 1.6; text-align: center;
+    }
+    @media (max-width: 768px) { #share-panel { bottom: 132px; right: 10px; } }
+
     /* ========== 加载遮罩（进度条；不透明，切换时避免闪烁） ========== */
     #loading-overlay {
       position: fixed; inset: 0; z-index: 30;
@@ -149,7 +180,17 @@
     <button id="back-btn">← 返回全景</button>
   </div>
 
-  <button id="share-btn">复制链接</button>
+  <button id="share-btn">分享 / 二维码</button>
+
+  <div id="share-panel">
+    <div class="sp-head">分享给微信 / 手机</div>
+    <div class="sp-url-row">
+      <input id="share-url" readonly />
+      <button id="share-copy">复制</button>
+    </div>
+    <div class="sp-qr-wrap"><canvas id="share-qr" width="180" height="180"></canvas></div>
+    <div id="share-note"></div>
+  </div>
 
   <div id="loading-overlay">
     <div class="spinner"></div>
@@ -249,6 +290,8 @@
       r.setPixelRatio(Math.min(devicePixelRatio, 2));
       r.setSize(innerWidth, innerHeight);
       r.outputColorSpace = THREE.SRGBColorSpace;
+      r.toneMapping = THREE.ACESFilmicToneMapping;   // 电影级色调映射，提升清晰立体感
+      r.toneMappingExposure = 1.0;
       r.domElement.id = id;
       app.appendChild(r.domElement);
       return r;
@@ -477,12 +520,31 @@
     }
 
     /* ================= 动态加载高精度模型（带进度 + 竞态令牌） ================= */
+    // 纹理各向异性：拉近/斜视角时贴图不糊的关键（上限 8，兼顾移动端性能）
+    function boostTextures(obj) {
+      const maxAniso = rendererHigh.capabilities.getMaxAnisotropy();
+      obj.traverse(o => {
+        if (o.material) {
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach(m => {
+            if (!m) return;
+            for (const k in m) {
+              if (m[k] && m[k].isTexture) {
+                m[k].anisotropy = Math.min(8, maxAniso);
+                m[k].needsUpdate = true;
+              }
+            }
+          });
+        }
+      });
+    }
     function loadHighModel(device) {
       const token = ++state.loadToken;
       return new Promise(resolve => {
         loader.load(device.model, gltf => {
           if (token !== state.loadToken) { resolve(null); return; }   // 已被更新请求取代
           const obj = gltf.scene || gltf.scenes[0];
+          boostTextures(obj);           // 贴图各向异性拉满（拉近清晰）
           sceneHigh.add(obj);
           state.highModel = obj;
           resolve(obj);
@@ -492,8 +554,7 @@
           }
         }, () => {
           // 失败：也返回 null（面板仍显示参数，状态栏提示缺失）
-          if (token === state.loadToken) resolve(null);
-          else resolve(null);
+          resolve(null);
         });
       });
     }
@@ -698,11 +759,67 @@
       if (e.key === 'Escape' && state.mode === Mode.DETAIL) exitDetail();
     });
     document.getElementById('back-btn').addEventListener('click', exitDetail);
+
+    /* ================= 分享：公网链接 + 二维码（微信扫码打开） ================= */
+    // 公网正式地址（CloudBase 静态托管，自动部署，微信/手机可打开）
+    // 本地访问（localhost）时自动替换为该地址，避免把 localhost 发给别人打不开
+    const PUBLIC_URL = 'https://baigukeji-d6g7omgxc78b09a62-1469467156.tcloudbaseapp.com/';
+    function isLocalUrl(url) {
+      return /localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|192\.168\.|^https?:\/\/10\.|^https?:\/\/172\.(1[6-9]|2\d|3[01])\./i.test(url);
+    }
+    function getShareUrl() {
+      const cur = location.href;
+      return isLocalUrl(cur) ? PUBLIC_URL : cur;
+    }
+    // 二维码库加载（本地优先，CDN 回退）
+    function loadQR(cb) {
+      if (window.QRCode) return cb(window.QRCode);
+      const urls = [
+        './lib/qrcode.min.js',
+        'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.js',
+        'https://registry.npmmirror.com/qrcode/latest/files/build/qrcode.js',
+        'https://unpkg.com/qrcode/build/qrcode.js'
+      ];
+      let i = 0;
+      (function next() {
+        if (i >= urls.length) return cb(null);
+        const s = document.createElement('script');
+        s.src = urls[i++];
+        s.onload = () => (window.QRCode ? cb(window.QRCode) : next());
+        s.onerror = next;
+        document.head.appendChild(s);
+      })();
+    }
+    function refreshSharePanel() {
+      const url = getShareUrl();
+      const input = document.getElementById('share-url');
+      const note = document.getElementById('share-note');
+      input.value = url;
+      note.textContent = isLocalUrl(location.href)
+        ? '当前是本地地址，已自动替换为公网链接（微信可打开）'
+        : '微信/手机扫码即可打开本页面';
+      loadQR(QR => {
+        const qr = document.getElementById('share-qr');
+        if (QR) {
+          try { QR.toCanvas(qr, url, { width: 180, margin: 1, errorCorrectionLevel: 'M' }); }
+          catch (e) { note.textContent = '二维码生成失败，请直接复制链接发送。'; }
+        } else {
+          note.textContent = '二维码组件加载失败（可能离线），请直接复制链接发送。';
+        }
+      });
+    }
+    const sharePanel = document.getElementById('share-panel');
     document.getElementById('share-btn').addEventListener('click', () => {
-      const url = location.href;
-      const done = () => { const b = document.getElementById('share-btn'); b.textContent = '✓ 已复制'; setTimeout(() => b.textContent = '复制链接', 1500); };
+      const show = sharePanel.classList.toggle('show');
+      if (show) refreshSharePanel();
+    });
+    document.getElementById('share-copy').addEventListener('click', () => {
+      const input = document.getElementById('share-url');
+      const url = input.value;
+      if (!url) return;
+      const done = () => { const b = document.getElementById('share-copy'); b.textContent = '✓ 已复制'; setTimeout(() => b.textContent = '复制', 1500); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done);
-      else { const ta = document.createElement('textarea'); ta.value = url; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+      else { input.select(); document.execCommand('copy'); done(); }
     });
 
     // 启动：全景视角就位后渲染设备全景
