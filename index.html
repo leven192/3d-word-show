@@ -2,948 +2,709 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Three.js GLB Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D 设备层级下钻系统</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100vw; height: 100vh; overflow: hidden; }
-    body {
-      /* 浅色科技蓝径向渐变：默认中心色 #b1cdec (R177 G205 B236) → 四周略深蓝 */
-      background: radial-gradient(circle at center, #b1cdec 0%, #9dc0e4 55%, #7fa9d9 100%);
-      background-attachment: fixed;
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #10131a;
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
     }
     #app { position: fixed; inset: 0; }
-    canvas { display: block; }
 
-    /* 加载提示 / 错误提示 */
-    #overlay {
-      position: fixed; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 14px; color: #e8eaf0; font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
-      pointer-events: none; z-index: 10; text-align: center; padding: 20px;
-    }
-    #overlay .spinner {
-      width: 46px; height: 46px; border-radius: 50%;
-      border: 4px solid rgba(255,255,255,.15);
-      border-top-color: #4da3ff;
-      animation: spin 0.9s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #overlay .msg { font-size: 16px; opacity: .92; line-height: 1.7; max-width: 720px; }
-    #overlay .msg.error { color: #ff7b72; }
-    #overlay .msg .small { font-size: 13px; opacity: .75; color: #b8bdc9; }
-    #overlay .msg code {
-      background: rgba(255,255,255,.09); border-radius: 4px; padding: 1px 6px;
-      font-size: 13px;
+    /* 双层画布：底层=全景低模场景，顶层=详情高精度模型（透明） */
+    #app canvas { position: absolute; inset: 0; display: block; }
+    #low-canvas  { z-index: 1; pointer-events: none; transition: filter .7s ease, transform .7s ease; }
+    #high-canvas { z-index: 2; pointer-events: auto; }
+    /* 背景虚化：详情模式下底层全景变模糊+变暗，突出顶层特写 */
+    #app.blur #low-canvas {
+      filter: blur(12px) brightness(.5) saturate(.6);
+      transform: scale(1.06);
     }
 
-    /* 模型名称标签（左上角） */
-    #model-label {
-      position: fixed; top: 14px; left: 14px; z-index: 20;
-      background: rgba(20, 23, 30, .72); border: 1px solid rgba(255,255,255,.09);
-      border-radius: 8px; padding: 6px 12px;
-      color: #d5d9e2; font: 13px "Segoe UI", "Microsoft YaHei", sans-serif;
-      max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      display: none;
-    }
-    #model-label b { color: #4da3ff; font-weight: 600; }
-
-    /* 拖拽高亮 */
-    #app.dragging::after {
-      content: "松开以加载 GLB 文件";
-      position: fixed; inset: 12px; z-index: 30;
-      border: 2px dashed #4da3ff; border-radius: 14px;
-      background: rgba(13, 18, 30, .72);
-      display: flex; align-items: center; justify-content: center;
-      color: #cfe2ff; font: 17px "Segoe UI", "Microsoft YaHei", sans-serif; pointer-events: none;
-    }
-
+    /* ========== 顶部提示（全景模式） ========== */
     #hint {
-      position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
-      color: rgba(232,234,240,.5); font: 12px "Segoe UI", "Microsoft YaHei", sans-serif;
-      z-index: 20; pointer-events: none; white-space: nowrap;
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 6;
+      color: rgba(230,235,245,.85); font-size: 13px; letter-spacing: 1px;
+      background: rgba(10,14,22,.55); border: 1px solid rgba(255,255,255,.1);
+      padding: 7px 18px; border-radius: 20px; white-space: nowrap;
+      transition: opacity .4s, transform .4s; pointer-events: none;
+    }
+    #hint.hidden { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+
+    /* ========== 详情参数面板 ========== */
+    #detail-panel {
+      position: fixed; z-index: 12;
+      top: 16px; right: 16px; width: 300px;
+      background: rgba(16,20,30,.88); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.12); border-radius: 14px;
+      padding: 18px; color: #e8ecf4;
+      box-shadow: 0 12px 40px rgba(0,0,0,.5);
+      transform: translateX(24px); opacity: 0; pointer-events: none;
+      transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .45s;
+    }
+    #detail-panel.show { transform: translateX(0); opacity: 1; pointer-events: auto; }
+    #detail-panel .dp-name { font-size: 19px; font-weight: 700; }
+    #detail-panel .dp-desc  { color: rgba(232,236,244,.6); font-size: 12px; margin: 6px 0 14px; line-height: 1.6; }
+    #detail-panel table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    #detail-panel td { font-size: 12.5px; padding: 6px 2px; border-bottom: 1px solid rgba(255,255,255,.07); }
+    #detail-panel td:first-child { color: rgba(232,236,244,.5); width: 38%; }
+    #detail-panel td:last-child { text-align: right; color: #9fc6ff; }
+    #detail-panel .dp-status { font-size: 11.5px; margin-bottom: 14px; min-height: 16px; }
+    #detail-panel .dp-status.ok  { color: #5fd08a; }
+    #detail-panel .dp-status.err { color: #ff7a7a; }
+    #detail-panel .dp-status.loading { color: #ffc46b; }
+    #back-btn {
+      width: 100%; padding: 10px; border: none; border-radius: 9px; cursor: pointer;
+      background: linear-gradient(90deg, #2e5bff, #5a3dff); color: #fff; font-size: 14px; font-weight: 600;
+      letter-spacing: 2px; transition: filter .2s, transform .1s;
+    }
+    #back-btn:hover { filter: brightness(1.15); }
+    #back-btn:active { transform: scale(.97); }
+    @media (max-width: 768px) {
+      #detail-panel { top: auto; bottom: 116px; right: 10px; left: 10px; width: auto; transform: translateY(16px); }
+      #detail-panel.show { transform: translateY(0); }
     }
 
-    /* 分享按钮与面板 */
+    /* ========== 设备列表（桌面左侧栏 / 手机底部横条） ========== */
+    #device-panel {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 10;
+      width: 210px;
+      background: rgba(14,18,26,.8); backdrop-filter: blur(8px);
+      border-right: 1px solid rgba(255,255,255,.08);
+      display: flex; flex-direction: column;
+    }
+    #device-panel h3 { color: #c9d2e0; font-size: 14px; font-weight: 600; padding: 14px 14px 10px; }
+    #device-list { flex: 1; overflow-y: auto; padding: 0 10px 14px; }
+    .device-tile {
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 9px; padding: 8px 10px; margin-bottom: 6px; cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+    .device-tile:hover { background: rgba(255,255,255,.09); }
+    .device-tile.active { border-color: #3d6cff; background: rgba(61,108,255,.15); }
+    .device-tile .dname { color: #e4e9f2; font-size: 12.5px; font-weight: 600; }
+    .device-tile .dnum  { color: rgba(228,233,242,.4); font-size: 10.5px; margin-top: 2px; }
+    @media (max-width: 768px) {
+      #device-panel {
+        top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: 88px;
+        border-right: none; border-top: 1px solid rgba(255,255,255,.08);
+      }
+      #device-panel h3 { display: none; }
+      #device-list { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; overflow-y: hidden; }
+      .device-tile { flex: 0 0 72px; margin-bottom: 0; padding: 6px; text-align: center; }
+    }
+
     #share-btn {
-      position: fixed; right: 14px; bottom: 14px; z-index: 20;
-      background: #2b303b; color: #e8eaf0; border: 1px solid rgba(255,255,255,.12);
-      border-radius: 22px; padding: 8px 16px; cursor: pointer;
-      font: 13px "Segoe UI", "Microsoft YaHei", sans-serif;
-      box-shadow: 0 2px 10px rgba(0,0,0,.35); transition: background .15s;
+      position: fixed; right: 14px; bottom: 14px; z-index: 15; pointer-events: auto;
+      background: rgba(43,48,59,.85); color: #e8eaf0; border: 1px solid rgba(255,255,255,.12);
+      border-radius: 18px; padding: 7px 14px; cursor: pointer; font-size: 12px;
     }
     #share-btn:hover { background: #3a4150; }
-    #share-panel {
-      position: fixed; right: 14px; bottom: 60px; z-index: 20;
-      width: 250px; background: rgba(20,23,30,.94); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,.12); border-radius: 10px;
-      padding: 12px; display: none; color: #d5d9e2;
-      font: 12px "Segoe UI", "Microsoft YaHei", sans-serif;
-      box-shadow: 0 4px 18px rgba(0,0,0,.45);
+    @media (max-width: 768px) { #share-btn { bottom: 96px; } }
+
+    /* ========== 加载遮罩（进度条；不透明，切换时避免闪烁） ========== */
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 30;
+      background: #10131a;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      transition: opacity .35s;
     }
-    #share-panel h4 { margin: 0 0 8px; font-size: 13px; color: #e8eaf0; }
-    #share-url-row { display: flex; gap: 6px; margin-bottom: 10px; }
-    #share-url {
-      flex: 1; min-width: 0; background: #262b36; color: #cfe2ff;
-      border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
-      padding: 6px 8px; font-size: 11px; outline: none;
+    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 4px solid rgba(255,255,255,.15); border-top-color: #4da3ff;
+      animation: spin .9s linear infinite;
     }
-    #share-copy { background: #3d6cff; color: #fff; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; }
-    #share-copy:hover { background: #2f58d6; }
-    #share-qr-wrap { display: flex; justify-content: center; }
-    #share-qr { background: #fff; border-radius: 6px; padding: 6px; width: 180px; height: 180px; }
-    #share-note { margin-top: 8px; color: rgba(232,234,240,.55); font-size: 11px; line-height: 1.6; }
-    /* 本地环境黄色警告 */
-    #share-warn {
-      display: none; margin-bottom: 8px; padding: 6px 8px;
-      background: rgba(255, 200, 60, .15); color: #ffc93c;
-      border: 1px solid rgba(255, 200, 60, .4); border-radius: 6px;
-      font-size: 11px; line-height: 1.5;
-    }
-    /* 手动输入框 */
-    #share-manual-row { display: flex; gap: 6px; margin-top: 10px; }
-    #share-manual {
-      flex: 1; min-width: 0; background: #262b36; color: #cfe2ff;
-      border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
-      padding: 6px 8px; font-size: 11px; outline: none;
-    }
-    #share-manual::placeholder { color: rgba(207,226,255,.4); }
-    #share-manual-btn {
-      background: #3d6cff; color: #fff; border: none; border-radius: 6px;
-      padding: 6px 10px; cursor: pointer; font-size: 11px; white-space: nowrap;
-    }
-    #share-manual-btn:hover { background: #2f58d6; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-text { color: #e8eaf0; font-size: 14px; }
+    .progress-wrap { width: 240px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+    #progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #4da3ff, #7c6bff); transition: width .2s; }
+    #loading-overlay.error .spinner { border-top-color: #ff6b6b; }
+    #loading-overlay.error #loading-text { color: #ff6b6b; }
+
+    .lg { z-index: 5 !important; }
   </style>
 </head>
 <body>
-  <div id="app">
-    <div id="overlay">
-      <div class="spinner"></div>
-      <div class="msg">正在加载 model.glb ...</div>
-    </div>
+  <div id="app"></div>
+
+  <div id="hint">设备全景 · 点击任意设备下钻查看详情</div>
+
+  <div id="device-panel">
+    <h3>设备列表</h3>
+    <div id="device-list"></div>
   </div>
 
-  <div id="model-label">模型：<b id="model-name">model.glb</b></div>
-  <div id="hint">单指/左键旋转 · 双指/右键平移 · 双指/滚轮缩放 · 右上角 lil-gui 控制面板</div>
-
-  <button id="share-btn">分享 / 二维码</button>
-  <div id="share-panel">
-    <h4>把链接发给微信好友</h4>
-    <div id="share-warn">⚠️ 检测到本地环境，请启动 cpolar 以获取公网二维码</div>
-    <div id="share-url-row">
-      <input id="share-url" readonly />
-      <button id="share-copy">复制</button>
-    </div>
-    <div id="share-qr-wrap"><canvas id="share-qr"></canvas></div>
-    <div id="share-manual-row">
-      <input id="share-manual" placeholder="手动粘贴公网链接（如 https://xxx.cpolar.top）" />
-      <button id="share-manual-btn">生成二维码</button>
-    </div>
-    <div id="share-note">手机微信/浏览器扫码即可查看 · 若微信拦截链接，点右上角「在浏览器中打开」</div>
+  <div id="detail-panel">
+    <div class="dp-name"></div>
+    <div class="dp-desc"></div>
+    <table class="dp-params"></table>
+    <div class="dp-status"></div>
+    <button id="back-btn">← 返回全景</button>
   </div>
 
-  <!-- 极老内核检测（如极速浏览器「兼容模式」= IE 内核，不支持 ES Module） -->
-  <script>
-    (function () {
-      var s = document.createElement('script');
-      s.type = 'module';
-      s.textContent = 'window.__ESM_OK__ = true;';
-      document.head.appendChild(s);
-      setTimeout(function () {
-        if (!window.__ESM_OK__) {
-          var ov = document.getElementById('overlay');
-          if (ov && ov.style.display !== 'none') {
-            ov.innerHTML = '<div class="msg error">当前浏览器过于老旧，无法运行 3D 页面（不支持 ES Module）。<br>' +
-              '<span class="small">请使用 Chrome / Safari / Edge，或在极速浏览器地址栏切换到「极速模式」。</span></div>';
-          }
-        }
-      }, 1500);
-    })();
-  </script>
+  <button id="share-btn">复制链接</button>
 
-  <!-- 默认 CDN（jsdelivr，全球 + 国内节点）；若加载失败会自动切换备用 CDN -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">加载中…</div>
+    <div class="progress-wrap"><div id="progress-bar"></div></div>
+  </div>
+
+  <!-- 备用 CDN（本地 lib/ 不可用时自动切换） -->
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
       }
     }
   </script>
-
-  <!-- 二维码库加载（本地优先，多 CDN 回退；供分享面板使用） -->
   <script>
-    window.__QR_CDNS = [
-      './lib/qrcode.min.js',
-      'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.js',
-      'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.js',
-      'https://registry.npmmirror.com/qrcode/latest/files/build/qrcode.js',
-      'https://unpkg.com/qrcode/build/qrcode.js',
-      'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js',
-      'https://registry.npmmirror.com/qrcode/latest/files/build/qrcode.min.js',
-      'https://unpkg.com/qrcode/build/qrcode.min.js'
+    window.__CDNS = [
+      { name: 'unpkg',     three: 'https://unpkg.com/three@0.160.0/build/three.module.js',          addons: 'https://unpkg.com/three@0.160.0/examples/jsm/', gui: 'https://unpkg.com/lil-gui@0.20.0/dist/lil-gui.esm.min.js' },
+      { name: 'jsdelivr',  three: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js', addons: 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/', gui: 'https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js' },
+      { name: 'npmmirror', three: 'https://registry.npmmirror.com/three/0.160.0/files/build/three.module.js', addons: 'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/', gui: 'https://registry.npmmirror.com/lil-gui/0.20.0/files/dist/lil-gui.esm.min.js' }
     ];
-    window.__loadQR = function (cb) {
-      var i = 0;
-      (function next() {
-        if (i >= window.__QR_CDNS.length) { cb && cb(null); return; }
-        var s = document.createElement('script');
-        s.src = window.__QR_CDNS[i++];
-        s.onload = function () { cb && cb(window.QRCode || null); };
-        s.onerror = next;
-        document.head.appendChild(s);
-      })();
-    };
-  </script>
-
-  <!-- ============================================================
-       分享链接配置
-       - 优先读取 share-config.js / current-url.txt：由「启动.bat」每次运行
-         自动写入最新 cpolar 公网地址（隧道重启地址变了也会自动更新）；
-       - 没有可用公网地址时，页面显示"生成中"，绝不使用过期/死地址。
-       ============================================================ -->
-  <script src="share-config.js"></script>
-  <script src="model-embedded.js"></script>
-  <script>
-    window.__SHARE_PUBLIC_URL = window.__SHARE_PUBLIC_URL || '';
+    function __injectImportMap(cdn) {
+      var s = document.createElement('script');
+      s.type = 'importmap';
+      s.textContent = JSON.stringify({ imports: { 'three': cdn.three, 'three/addons/': cdn.addons } });
+      document.head.appendChild(s);
+    }
   </script>
 
   <script type="module">
-    // ---------- 兼容性：加载 three.js + lil-gui ----------
-    // 两条加载路径：
-    // 路径① importmap：浏览器支持 importmap（Chrome 89+ / iOS 16.4+ 等）
-    //    → 多 CDN 回退（jsdelivr → npmmirror → unpkg），国内网络友好；
-    // 路径② 直连 URL：老内核不支持 importmap（老版极速浏览器、旧微信 X5 内核等）
-    //    → 使用会自动改写裸导入的 CDN（jsdelivr +esm / esm.sh / jspm），
-    //      任何支持 ES Module 的浏览器都能加载，完全不需要 importmap。
-    // 注意：探测 importmap 不能用 HTMLScriptElement.supports()（Safari 17.2 才有，
-    // iOS 16.7 支持 importmap 却没有它），改用运行时真探测。
+    /* ============================================================
+     *  层级下钻 3D 展示系统
+     *  状态机：OVERVIEW(全景) -> TRANSITION(飞行/加载) -> DETAIL(详情)
+     *          DETAIL -> TRANSITION -> OVERVIEW（返回）
+     *  内存管理：全景低模 = 常驻 InstancedMesh（共享几何体/材质，永不重建）
+     *            详情高模 = 按需加载，返回时递归释放 geometry/material/texture
+     * ============================================================ */
+    const overlay = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
+    const progressBar = document.getElementById('progress-bar');
 
-    async function importMapSupported() {
-      try {
-        const blob = new Blob(['export default 1;'], { type: 'text/javascript' });
-        const url = URL.createObjectURL(blob);
-        const key = '__probe__' + Math.random().toString(36).slice(2);
-        const s = document.createElement('script');
-        s.type = 'importmap';
-        s.textContent = JSON.stringify({ imports: { [key]: url } });
-        document.head.appendChild(s);
-        await import(key);
-        return true;
-      } catch (e) {
-        console.warn('[GLB Viewer] importmap 探测失败:', e);
-        return false;
-      }
+    function showFatal(msg) {
+      overlay.classList.remove('hidden');
+      overlay.classList.add('error');
+      loadingText.textContent = '加载失败：' + msg;
+      progressBar.style.width = '100%';
     }
 
-    const IMPORTMAP_CDNS = [
-      {
-        name: 'npmmirror(国内)',
-        three: 'https://registry.npmmirror.com/three/0.160.0/files/build/three.module.js',
-        addons: 'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/',
-        gui: 'https://registry.npmmirror.com/lil-gui/0.20.0/files/dist/lil-gui.esm.min.js'
-      },
-      {
-        name: 'jsdelivr',
-        three: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
-        addons: 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/',
-        gui: 'https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js'
-      },
-      {
-        name: 'unpkg',
-        three: 'https://unpkg.com/three@0.160.0/build/three.module.js',
-        addons: 'https://unpkg.com/three@0.160.0/examples/jsm/',
-        gui: 'https://unpkg.com/lil-gui@0.20.0/dist/lil-gui.esm.min.js'
-      }
-    ];
-
-    // 直连路径的 CDN（自带裸导入改写，无需 importmap）
-    const DIRECT_CDNS = [
-      {
-        name: 'jsdelivr(+esm)',
-        three: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
-        orbit: 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js/+esm',
-        gltf: 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js/+esm',
-        gui: 'https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js'
-      },
-      {
-        name: 'esm.sh',
-        three: 'https://esm.sh/three@0.160.0/build/three.module.js',
-        orbit: 'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js',
-        gltf: 'https://esm.sh/three@0.160.0/examples/jsm/loaders/GLTFLoader.js',
-        gui: 'https://esm.sh/lil-gui@0.20.0'
-      },
-      {
-        name: 'jspm',
-        three: 'https://ga.jspm.io/npm:three@0.160.0/build/three.module.js',
-        orbit: 'https://ga.jspm.io/npm:three@0.160.0/examples/jsm/controls/OrbitControls.js',
-        gltf: 'https://ga.jspm.io/npm:three@0.160.0/examples/jsm/loaders/GLTFLoader.js',
-        gui: 'https://ga.jspm.io/npm:lil-gui@0.20.0/dist/lil-gui.esm.min.js'
-      }
-    ];
-
-    function injectImportMap(cdn) {
-      const s = document.createElement('script');
-      s.type = 'importmap';
-      s.textContent = JSON.stringify({
-        imports: {
-          'three': cdn.three,
-          'three/addons/': cdn.addons
-        }
-      });
-      document.head.appendChild(s);
-    }
-
-    // 加载状态跟踪（诊断"一直转圈"：实时显示当前阶段 + 超时看门狗）
-    let loadPhase = '加载 3D 引擎';
-    function setPhase(t, d) {
-      loadPhase = t + (d ? ' (' + d + ')' : '');
-      const ovEl = document.getElementById('overlay');
-      const msgEl = ovEl && ovEl.querySelector('.msg');
-      if (msgEl && ovEl.style.display !== 'none') {
-        msgEl.innerHTML = escapeHtml(loadPhase);
-      }
-    }
-
-    // 每个 CDN 导入限时 10 秒，超时立即换下一个源（避免网络黑洞卡死页面）
-    function withTimeout(promise, ms, label) {
-      return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(label + ' 加载超时')), ms))
-      ]);
-    }
-
-    // mode: 'importmap' | 'direct'
-    async function loadLibs(cdns, mode) {
-      for (const cdn of cdns) {
-        try {
-          setPhase('加载 3D 引擎', cdn.name);
-          let THREE, OrbitControls, GLTFLoader, GUI;
-          if (mode === 'importmap') {
-            injectImportMap(cdn);
-            THREE = await withTimeout(import('three'), 10000, cdn.name);
-            OrbitControls = (await withTimeout(import('three/addons/controls/OrbitControls.js'), 10000, cdn.name)).OrbitControls;
-            GLTFLoader = (await withTimeout(import('three/addons/loaders/GLTFLoader.js'), 10000, cdn.name)).GLTFLoader;
-            GUI = (await withTimeout(import(cdn.gui), 10000, cdn.name)).default;
-          } else {
-            THREE = await withTimeout(import(cdn.three), 10000, cdn.name);
-            OrbitControls = (await withTimeout(import(cdn.orbit), 10000, cdn.name)).OrbitControls;
-            GLTFLoader = (await withTimeout(import(cdn.gltf), 10000, cdn.name)).GLTFLoader;
-            GUI = (await withTimeout(import(cdn.gui), 10000, cdn.name)).default;
-          }
-          console.log('[GLB Viewer] 使用 CDN:', cdn.name, mode === 'importmap' ? '(importmap)' : '(direct)');
-          return { THREE, OrbitControls, GLTFLoader, GUI };
-        } catch (e) {
-          cdnErrors.push(cdn.name + ': ' + (e && e.message ? e.message : e));
-          console.warn('[GLB Viewer] CDN 加载失败: ' + cdn.name, e);
-        }
-      }
-      return null;
-    }
-
-    // ---------- 加载顺序：本地依赖优先（秒开），CDN 兜底 ----------
-    // 本地依赖 = 与页面同服务器，任何浏览器/微信都能秒开，不受外网 CDN 影响。
-    // 首次使用请先运行「下载依赖.bat」（一次性把 three.js 等下载到 lib/ 目录）。
-    async function loadLocalLibs() {
-      try {
-        setPhase('加载 3D 引擎', '本地 lib');
-        const THREE = await import('./lib/three.module.js');
-        const OrbitControls = (await import('./lib/OrbitControls.js')).OrbitControls;
-        const GLTFLoader = (await import('./lib/GLTFLoader.js')).GLTFLoader;
-        const GUI = (await import('./lib/lil-gui.esm.min.js')).default;
-        console.log('[GLB Viewer] 使用本地依赖（秒开模式）');
-        return { THREE, OrbitControls, GLTFLoader, GUI };
-      } catch (e) {
-        console.warn('[GLB Viewer] 本地 lib/ 依赖不可用（未运行下载依赖.bat？）:', e);
-        return null;
-      }
-    }
-
-    const cdnErrors = [];
-    let libs = await loadLocalLibs();
-    if (!libs) {
-      // CDN 兜底：先 importmap 路径（现代内核），再直连路径（老内核）
-      if (await importMapSupported()) {
-        libs = await loadLibs(IMPORTMAP_CDNS, 'importmap');
-      } else {
-        console.warn('[GLB Viewer] 浏览器不支持 importmap，改用直连 URL 加载（兼容老内核）');
-      }
-    }
-    if (!libs) {
-      libs = await loadLibs(DIRECT_CDNS, 'direct');
-    }
-
-    if (!libs) {
-      loadPhase = 'error';
-      // 区分"内核太老"与"网络/CDN 问题"
-      const specErr = cdnErrors.some(s => /Invalid module specifier|Failed to resolve module specifier|Unexpected identifier|does not provide an export/i.test(s));
-      document.getElementById('overlay').innerHTML = specErr
-        ? '<div class="msg error">当前浏览器过于老旧，无法加载 three.js（不支持 ES Module）。<br>' +
-          '<span class="small">请使用 Chrome / Safari / Edge，或在极速浏览器地址栏切换为「极速模式」。</span></div>'
-        : '<div class="msg error">无法加载 three.js / lil-gui 库（所有 CDN 均失败）<br>' +
-          '<span class="small">' + cdnErrors.map(escapeHtml).join('<br>') +
-          '<br><br>请检查网络后刷新页面。</span></div>';
-      throw new Error('All CDNs failed');
-    }
-    const { THREE, OrbitControls, GLTFLoader, GUI } = libs;
-
-    // 看门狗：25 秒还没加载完成就弹出诊断 + 重试按钮（不再无限转圈）
-    setTimeout(() => {
-      if (loadPhase !== 'done' && loadPhase !== 'error') {
-        const ovEl = document.getElementById('overlay');
-        const msgEl = ovEl && ovEl.querySelector('.msg');
-        if (msgEl && ovEl.style.display !== 'none') {
-          msgEl.innerHTML = '<span style="color:#ffb454">加载超时，可能卡在：' + escapeHtml(loadPhase) + '</span><br>' +
-            '<span class="small">请检查网络后点下方重试；若反复超时，可能是某个 CDN 被网络屏蔽，' +
-            '可换浏览器、切手机网络，或在电脑上用 Chrome 打开试试。</span><br>' +
-            '<button onclick="location.reload()" style="pointer-events:auto;cursor:pointer;margin-top:12px;padding:8px 20px;border:none;border-radius:8px;background:#3d6cff;color:#fff;font-size:14px">重新加载</button>';
-        }
-      }
-    }, 25000);
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    }
-
-    // 手机端出错的可见提示（避免一直转圈让人误以为卡住）
-    function showFatalError(msg, err) {
-      const ov = document.getElementById('overlay');
-      if (!ov) return;
-      ov.innerHTML = '<div class="msg error">' + msg +
-        '<br><span class="small">' + (err && err.message ? escapeHtml(err.message) : '') + '</span></div>';
-      ov.style.display = 'flex';
-    }
-
-    // ---------- 场景 ----------
-    const app = document.getElementById('app');
-    const overlay = document.getElementById('overlay');
-    const modelNameEl = document.getElementById('model-name');
-    const modelLabel = document.getElementById('model-label');
-
-    const scene = new THREE.Scene();
-    scene.background = null; // 透明背景，透出 CSS 科技蓝径向渐变
-
-    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 2000);
-    camera.position.set(4, 3, 6);
-
-    // WebGL 创建失败时先降级（关闭抗锯齿），再失败则给出明确提示（iOS 微信偶发）
-    let renderer;
+    // ---------- 加载 three.js（本地优先，CDN 回退） ----------
+    let THREE, OrbitControls, GLTFLoader, GUI;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    } catch (e1) {
-      try {
-        renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-        console.warn('[GLB Viewer] WebGL 降级：关闭抗锯齿');
-      } catch (e2) {
-        showFatalError('无法创建 WebGL 渲染器：当前浏览器/微信内核不支持 WebGL，请升级微信或用手机系统浏览器打开。', e2);
-        throw e2;
+      THREE = await import('./lib/three.module.js');
+      OrbitControls = (await import('./lib/OrbitControls.js')).OrbitControls;
+      GLTFLoader = (await import('./lib/GLTFLoader.js')).GLTFLoader;
+      GUI = (await import('./lib/lil-gui.esm.min.js')).default;
+      console.log('[下钻系统] 使用本地依赖');
+    } catch (e) {
+      console.warn('[下钻系统] 本地依赖不可用，尝试 CDN', e);
+      let ok = false;
+      for (const cdn of window.__CDNS) {
+        try {
+          __injectImportMap(cdn);
+          THREE = await import('three');
+          OrbitControls = (await import('three/addons/controls/OrbitControls.js')).OrbitControls;
+          GLTFLoader = (await import('three/addons/loaders/GLTFLoader.js')).GLTFLoader;
+          GUI = (await import(cdn.gui)).default;
+          console.log('[下钻系统] 使用 CDN:', cdn.name);
+          ok = true;
+          break;
+        } catch (e2) { console.warn('CDN 失败', cdn.name, e2); }
       }
+      if (!ok) { showFatal('3D 引擎加载失败，请检查网络后刷新'); throw new Error('no engine'); }
     }
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
-    app.appendChild(renderer.domElement);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
+    /* ================= 状态机 ================= */
+    const Mode = Object.freeze({ OVERVIEW: 0, TRANSITION: 1, DETAIL: 2 });
+    const state = {
+      mode: Mode.OVERVIEW,   // 当前场景模式
+      devices: [],           // models.json 的设备列表
+      selectedIndex: -1,     // 当前选中的设备下标（-1 = 未选中）
+      highModel: null,       // 当前详情模式的高精度模型（可卸载）
+      loadToken: 0,          // 竞态令牌：新加载使旧加载失效
+      enterToken: 0,         // 进入流程令牌：返回/切换会使其失效
+      exitToken: 0,          // 退出流程令牌
+    };
+
+    /* ================= 双层渲染器 ================= */
+    const app = document.getElementById('app');
+    function makeRenderer(alpha, id) {
+      const r = new THREE.WebGLRenderer({ antialias: true, alpha });
+      r.setPixelRatio(Math.min(devicePixelRatio, 2));
+      r.setSize(innerWidth, innerHeight);
+      r.outputColorSpace = THREE.SRGBColorSpace;
+      r.domElement.id = id;
+      app.appendChild(r.domElement);
+      return r;
+    }
+    // 底层：全景低模场景（背景不透明，可被 CSS 虚化）
+    const rendererLow = makeRenderer(false, 'low-canvas');
+    // 顶层：详情高精度模型（透明背景，叠加在底层上方）
+    const rendererHigh = makeRenderer(true, 'high-canvas');
+
+    // 共享相机 + 控制器（交互绑定顶层画布）
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 2000);
+    const controls = new OrbitControls(camera, rendererHigh.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.target.set(0, 0, 0);
 
-    // ---------- 灯光 ----------
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.9);
-    scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xffffff, 2.2);
-    key.position.set(5, 8, 4);
-    scene.add(key);
-    const fill = new THREE.DirectionalLight(0x88aaff, 0.8);
-    fill.position.set(-5, 2, -4);
-    scene.add(fill);
+    /* ================= 全景场景（低模，常驻） ================= */
+    const sceneLow = new THREE.Scene();
+    sceneLow.background = new THREE.Color(0x141a26);
 
-    // 参考网格
-    const grid = new THREE.GridHelper(20, 20, 0x3a4150, 0x232833);
-    grid.visible = false;
-    scene.add(grid);
+    // 灯光（两个场景共用同一套光效）
+    const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x1a2030, 1.1);
+    const keyL = new THREE.DirectionalLight(0xffffff, 2.0); keyL.position.set(6, 10, 5);
+    const fillL = new THREE.DirectionalLight(0x88aaff, 0.7); fillL.position.set(-6, 3, -5);
+    sceneLow.add(hemi, keyL, fillL);
 
-    // ---------- 模型管理 ----------
-    let modelGroup = null;
+    // 地面网格（虚化时同样变模糊，增强景深感）
+    const grid = new THREE.GridHelper(16, 20, 0x3a4a6a, 0x232e44);
+    grid.position.y = 0;
+    sceneLow.add(grid);
+    const floor = new THREE.Mesh(
+      new THREE.CircleGeometry(10, 64),
+      new THREE.MeshStandardMaterial({ color: 0x0d1119, roughness: 1, metalness: 0, transparent: true, opacity: .55 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0;
+    sceneLow.add(floor);
+
+    const N = 10;                 // 设备数量
+    const R = 5.0;                // 全景环形半径
+    const bodyMesh = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.85, 0.85, 0.85),
+      new THREE.MeshStandardMaterial({ roughness: .35, metalness: .6, color: 0xffffff }),
+      N
+    );
+    const baseMesh = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(0.5, 0.62, 0.14, 24),
+      new THREE.MeshStandardMaterial({ roughness: .5, metalness: .5, color: 0xffffff }),
+      N
+    );
+    const defaultColors = [];
+    const dummy = new THREE.Object3D();
+    const devicePositions = [];   // 每台设备的全景坐标
+    const palette = [0x4da3ff, 0x5fd08a, 0xffc46b, 0xff8a5c, 0xc46bff, 0x4dd7d0, 0xff6b8a, 0x8aff6b, 0x6b8aff, 0xffb34d];
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      const p = new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R);
+      devicePositions.push(p);
+      // 机身
+      dummy.position.set(p.x, 0.55, p.z);
+      dummy.rotation.set(0, -a + Math.PI / 2, 0);
+      dummy.updateMatrix();
+      bodyMesh.setMatrixAt(i, dummy.matrix);
+      // 底座
+      dummy.position.set(p.x, 0.07, p.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      baseMesh.setMatrixAt(i, dummy.matrix);
+      // 实例颜色（渐变调色板）
+      const c = new THREE.Color(palette[i]);
+      bodyMesh.setColorAt(i, c);
+      baseMesh.setColorAt(i, c.clone().multiplyScalar(0.55));
+      defaultColors.push(c);
+    }
+    bodyMesh.instanceColor.needsUpdate = true;
+    baseMesh.instanceColor.needsUpdate = true;
+    sceneLow.add(bodyMesh, baseMesh);
+
+    // 名称标签（Sprite 文字纹理）
+    const labels = [];
+    function makeLabel(text, i) {
+      const cv = document.createElement('canvas');
+      cv.width = 256; cv.height = 64;
+      const ctx = cv.getContext('2d');
+      ctx.font = 'bold 34px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 256, 64);
+      ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 6;
+      ctx.strokeText(text, 128, 34);
+      ctx.fillStyle = '#eaf2ff'; ctx.fillText(text, 128, 34);
+      const tex = new THREE.CanvasTexture(cv);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+      sp.scale.set(2.2, 0.55, 1);
+      sp.position.set(devicePositions[i].x, 1.85, devicePositions[i].z);
+      sp.userData.deviceId = i;
+      sp.renderOrder = 10;
+      labels.push(sp);
+      sceneLow.add(sp);
+    }
+
+    /* ================= 高模场景（详情，动态加载/卸载） ================= */
+    const sceneHigh = new THREE.Scene();
+    // 独立灯光副本（object3D 同一时刻只能有一个 parent，不能复用全景灯光）
+    const hHemi = new THREE.HemisphereLight(0xdfe8ff, 0x1a2030, 1.1);
+    const hKey = new THREE.DirectionalLight(0xffffff, 2.2); hKey.position.set(6, 10, 5);
+    const hFill = new THREE.DirectionalLight(0x88aaff, 0.7); hFill.position.set(-6, 3, -5);
+    sceneHigh.add(hHemi, hKey, hFill);
+
     const loader = new GLTFLoader();
 
-    function frameModel() {
-      if (!modelGroup) return;
-      const box = new THREE.Box3().setFromObject(modelGroup);
-      if (box.isEmpty()) return;
-      const sphere = box.getBoundingSphere(new THREE.Sphere());
-      const dist = sphere.radius / Math.tan((camera.fov * Math.PI) / 360) * 1.2;
-      // 自动适配近/远裁剪面（C4D 导出 GLB 默认以厘米为单位，模型可能很大）
-      camera.near = Math.max(0.01, sphere.radius * 0.001);
-      camera.far = Math.max(2000, dist * 12);
-      camera.updateProjectionMatrix();
-      const dir = new THREE.Vector3(1, 0.6, 0.9).normalize();
-      camera.position.copy(sphere.center).addScaledVector(dir, Math.max(dist, 0.5));
-      controls.target.copy(sphere.center);
-      controls.minDistance = sphere.radius * 0.05;
-      controls.maxDistance = sphere.radius * 30;
-      controls.update();
-    }
-
-    function applyWireframe(on) {
-      if (!modelGroup) return;
-      modelGroup.traverse(o => {
-        if (o.isMesh && o.material) {
-          o.material.wireframe = on;
-          o.material.needsUpdate = true;
-        }
-      });
-    }
-
-    // ---------- 模型着色（缓存原色，可恢复） ----------
-    let originalColors = null;
-
-    function storeOriginalColors() {
-      if (originalColors) return;
-      originalColors = [];
-      modelGroup.traverse(o => {
-        if (o.isMesh && o.material) {
-          const mats = Array.isArray(o.material) ? o.material : [o.material];
-          mats.forEach(m => { if (m.color) originalColors.push({ mat: m, color: m.color.getHex() }); });
-        }
-      });
-    }
-
-    function applyModelColor(hex) {
-      if (!modelGroup) return;
-      modelGroup.traverse(o => {
-        if (o.isMesh && o.material) {
-          const mats = Array.isArray(o.material) ? o.material : [o.material];
-          mats.forEach(m => { if (m.color) m.color.setHex(hex); });
-        }
-      });
-    }
-
-    function restoreModelColors() {
-      if (!originalColors) return;
-      originalColors.forEach(({ mat, color }) => { if (mat.color) mat.color.setHex(color); });
-    }
-
-    // ---------- 白膜模式（用纯色 PBR 材质覆盖，适合白膜导出预览） ----------
-    let clayModeActive = false;
-    let backupMaterials = null;
-
-    function enableClayMode() {
-      if (!modelGroup || clayModeActive) return;
-      clayModeActive = true;
-      backupMaterials = [];
-      modelGroup.traverse(o => {
-        if (o.isMesh) {
-          backupMaterials.push({ mesh: o, materials: o.material });
-          o.material = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(params.modelColor),
-            roughness: params.clayRoughness,
-            metalness: params.clayMetalness
-          });
-        }
-      });
-      applyWireframe(params.wireframe);
-      updateClayMaterial();
-    }
-
-    function disableClayMode() {
-      if (!backupMaterials) return;
-      backupMaterials.forEach(({ mesh, materials }) => { mesh.material = materials; });
-      backupMaterials = null;
-      clayModeActive = false;
-      applyWireframe(params.wireframe);
-    }
-
-    function updateClayMaterial() {
-      if (!clayModeActive || !modelGroup) return;
-      modelGroup.traverse(o => {
-        if (o.isMesh && o.material) {
+    /* ================= 内存管理：递归释放模型资源 ================= */
+    function disposeObject(obj) {
+      obj.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) {
           const mats = Array.isArray(o.material) ? o.material : [o.material];
           mats.forEach(m => {
-            if (m.isMeshStandardMaterial) {
-              m.color.set(params.modelColor);
-              m.roughness = params.clayRoughness;
-              m.metalness = params.clayMetalness;
-              m.needsUpdate = true;
-            }
+            if (!m) return;
+            for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose();
+            m.dispose();
           });
         }
       });
     }
+    function unloadHighModel() {
+      if (!state.highModel) return;
+      sceneHigh.remove(state.highModel);
+      disposeObject(state.highModel);
+      state.highModel = null;
+      console.log('[下钻系统] 已卸载高精度模型，内存已释放');
+    }
 
-    function setModel(object, name) {
-      if (modelGroup) {
-        scene.remove(modelGroup);
-        modelGroup.traverse(o => {
-          if (o.geometry) o.geometry.dispose();
-          if (o.material) {
+    /* ================= 相机飞行（平滑缓动） ================= */
+    function easeInOutCubic(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+    function flyTo(pos, tgt, dur = 900) {
+      return new Promise(res => {
+        const p0 = camera.position.clone();
+        const t0 = controls.target.clone();
+        const start = performance.now();
+        controls.enabled = false;   // 飞行期间锁定交互
+        (function step(now) {
+          const k = Math.min(1, (now - start) / dur);
+          const e = easeInOutCubic(k);
+          camera.position.lerpVectors(p0, pos, e);
+          controls.target.lerpVectors(t0, tgt, e);
+          controls.update();
+          if (k < 1) requestAnimationFrame(step);
+          else { controls.enabled = true; res(); }
+        })(start);
+      });
+    }
+
+    // 全景视角 / 详情特写视角
+    function overviewView() {
+      return { pos: new THREE.Vector3(0, 7.5, 13), tgt: new THREE.Vector3(0, 0, 0) };
+    }
+    function detailView(i) {
+      const p = devicePositions[i];
+      const dir = p.clone().normalize();
+      const pos = p.clone().addScaledVector(dir, 2.4).add(new THREE.Vector3(0, 0.9, 0));
+      const tgt = p.clone().add(new THREE.Vector3(0, 0.4, 0));
+      return { pos, tgt };
+    }
+
+    /* ================= 高亮选中设备（低模实例变色） ================= */
+    const HIGHLIGHT = new THREE.Color(0xffd54a);
+    function highlightInstance(i) {
+      for (let k = 0; k < N; k++) {
+        bodyMesh.setColorAt(k, k === i ? HIGHLIGHT : defaultColors[k]);
+        baseMesh.setColorAt(k, k === i ? HIGHLIGHT.clone().multiplyScalar(.8) : defaultColors[k].clone().multiplyScalar(.55));
+      }
+      bodyMesh.instanceColor.needsUpdate = true;
+      baseMesh.instanceColor.needsUpdate = true;
+    }
+    function clearHighlight() {
+      for (let k = 0; k < N; k++) {
+        bodyMesh.setColorAt(k, defaultColors[k]);
+        baseMesh.setColorAt(k, defaultColors[k].clone().multiplyScalar(.55));
+      }
+      bodyMesh.instanceColor.needsUpdate = true;
+      baseMesh.instanceColor.needsUpdate = true;
+    }
+
+    /* ================= 加载遮罩 ================= */
+    function setLoading(show, text, pct) {
+      if (show) {
+        overlay.classList.remove('hidden', 'error');
+        loadingText.textContent = text || '加载中…';
+        progressBar.style.width = (pct === undefined ? 0 : Math.round(pct * 100)) + '%';
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    /* ================= 详情面板 ================= */
+    const panel = document.getElementById('detail-panel');
+    const panelName = panel.querySelector('.dp-name');
+    const panelDesc = panel.querySelector('.dp-desc');
+    const panelParams = panel.querySelector('.dp-params');
+    const panelStatus = panel.querySelector('.dp-status');
+    function setStatus(text, cls) {
+      panelStatus.textContent = text;
+      panelStatus.className = 'dp-status' + (cls ? ' ' + cls : '');
+    }
+    function openPanel(device) {
+      panelName.textContent = device.name;
+      panelDesc.textContent = device.desc || '';
+      panelParams.innerHTML = '';
+      const list = device.params && device.params.length ? device.params : [];
+      if (!list.length) {
+        panelParams.innerHTML = '<tr><td colspan="2" style="text-align:left;color:rgba(232,236,244,.4)">暂无参数</td></tr>';
+      } else {
+        list.forEach(it => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + esc(it.k) + '</td><td>' + esc(it.v) + '</td>';
+          panelParams.appendChild(tr);
+        });
+      }
+      setStatus('正在加载模型…', 'loading');
+      panel.classList.add('show');
+    }
+    function closePanel() { panel.classList.remove('show'); }
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    /* ================= 动态加载高精度模型（带进度 + 竞态令牌） ================= */
+    function loadHighModel(device) {
+      const token = ++state.loadToken;
+      return new Promise(resolve => {
+        loader.load(device.model, gltf => {
+          if (token !== state.loadToken) { resolve(null); return; }   // 已被更新请求取代
+          const obj = gltf.scene || gltf.scenes[0];
+          sceneHigh.add(obj);
+          state.highModel = obj;
+          resolve(obj);
+        }, e => {
+          if (e && e.total && token === state.loadToken) {
+            setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
+          }
+        }, () => {
+          // 失败：也返回 null（面板仍显示参数，状态栏提示缺失）
+          if (token === state.loadToken) resolve(null);
+          else resolve(null);
+        });
+      });
+    }
+
+    /* ================= 模式切换（核心状态机逻辑） ================= */
+    async function enterDetail(i) {
+      // 守卫：过渡中禁止新进入；已在详情且同一台设备则忽略
+      if (state.mode === Mode.TRANSITION) return;
+      if (state.mode === Mode.DETAIL && state.selectedIndex === i) return;
+
+      const token = ++state.enterToken;
+      state.mode = Mode.TRANSITION;
+      state.selectedIndex = i;
+      const device = state.devices[i];
+
+      highlightInstance(i);
+      syncSidebar(i);
+      openPanel(device);            // 面板立即显示（参数来自 JSON，不依赖模型）
+      rendererHigh.domElement.style.cursor = 'wait';
+
+      // 若之前详情模式有模型 → 先卸载（切换到另一台设备时）
+      unloadHighModel();
+
+      setLoading(true, '飞入特写 · 加载 ' + device.name + '…', 0);
+      const view = detailView(i);
+      const flyP = flyTo(view.pos, view.tgt, 900);
+      const loadP = loadHighModel(device);
+
+      const [, model] = await Promise.all([flyP, loadP]);
+      if (token !== state.enterToken) { unloadHighModel(); return; }  // 已被返回/切换打断
+
+      // 背景虚化 + 高模特写取景（模型尺寸适配相机距离）
+      app.classList.add('blur');
+      if (model) {
+        fitDetailView(model);
+        setStatus('模型已加载', 'ok');
+      } else {
+        setStatus('模型加载失败（' + device.model + ' 不存在？）', 'err');
+      }
+      setLoading(false);
+      rendererHigh.domElement.style.cursor = '';
+      state.mode = Mode.DETAIL;
+      document.getElementById('hint').classList.add('hidden');
+      console.log('[下钻系统] 进入详情模式:', device.name);
+    }
+
+    async function exitDetail() {
+      // 允许在过渡中打断（用户点「返回」时可能仍在飞行/加载）
+      if (state.mode === Mode.OVERVIEW) return;
+      const token = ++state.exitToken;
+      state.enterToken++;           // 使进行中的进入流程失效
+      state.mode = Mode.TRANSITION;
+
+      setLoading(true, '返回全景…');
+      rendererHigh.domElement.style.cursor = 'wait';
+
+      unloadHighModel();            // ← 内存释放关键点
+      closePanel();
+      clearHighlight();
+      syncSidebar(-1);
+      app.classList.remove('blur');
+
+      const v = overviewView();
+      await flyTo(v.pos, v.tgt, 900);
+      if (token !== state.exitToken) return;
+      unloadHighModel();            // 兜底：处理加载竞态残留的模型
+
+      state.selectedIndex = -1;
+      setLoading(false);
+      rendererHigh.domElement.style.cursor = '';
+      state.mode = Mode.OVERVIEW;
+      document.getElementById('hint').classList.remove('hidden');
+      console.log('[下钻系统] 返回全景模式');
+    }
+
+    // 特写取景：根据高模包围球微调相机距离
+    function fitDetailView(obj) {
+      const box = new THREE.Box3().setFromObject(obj);
+      if (box.isEmpty()) return;
+      const r = box.getBoundingSphere(new THREE.Sphere()).radius;
+      const want = Math.max(r / Math.tan((camera.fov * Math.PI) / 360) * 1.15, r * 2);
+      const cur = camera.position.distanceTo(controls.target);
+      if (Math.abs(want - cur) > 0.05) {
+        const dir = camera.position.clone().sub(controls.target).normalize();
+        const pos = controls.target.clone().addScaledVector(dir, want);
+        camera.position.copy(pos);
+        camera.near = Math.max(0.01, r * 0.001);
+        camera.far = Math.max(100, want * 10);
+        camera.updateProjectionMatrix();
+        controls.update();
+      }
+    }
+
+    /* ================= 点击拾取（Raycaster → instanceId） ================= */
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let downPos = null;
+    rendererHigh.domElement.addEventListener('pointerdown', e => { downPos = [e.clientX, e.clientY]; });
+    rendererHigh.domElement.addEventListener('pointerup', e => {
+      if (!downPos) return;
+      const dx = e.clientX - downPos[0], dy = e.clientY - downPos[1];
+      downPos = null;
+      if (dx * dx + dy * dy > 36) return;   // 拖拽旋转不算点击
+      if (state.mode === Mode.TRANSITION) return;
+      pointer.x = (e.clientX / innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects([bodyMesh, baseMesh, ...labels], false);
+      if (!hits.length) return;
+      const h = hits[0];
+      const id = h.object.isInstancedMesh ? h.instanceId : h.object.userData.deviceId;
+      if (id == null) return;
+      if (state.mode === Mode.DETAIL && state.selectedIndex === id) return;
+      enterDetail(id);
+    });
+
+    /* ================= 设备列表（侧栏，与 3D 拾取双入口） ================= */
+    function syncSidebar(i) {
+      document.querySelectorAll('.device-tile').forEach((t, k) => {
+        t.classList.toggle('active', k === i);
+      });
+    }
+    function renderSidebar() {
+      const list = document.getElementById('device-list');
+      list.innerHTML = '';
+      state.devices.forEach((d, i) => {
+        const tile = document.createElement('div');
+        tile.className = 'device-tile';
+        tile.innerHTML = '<div class="dname">' + esc(d.name) + '</div><div class="dnum">#' + (i + 1) + '</div>';
+        tile.addEventListener('click', () => enterDetail(i));
+        list.appendChild(tile);
+      });
+    }
+
+    /* ================= 初始化：读 models.json → 构建全景 ================= */
+    async function init() {
+      try {
+        const r = await fetch('./models.json', { cache: 'no-store' });
+        const data = await r.json();
+        state.devices = data.devices || [];
+        if (!state.devices.length) { showFatal('models.json 中没有设备'); return; }
+        renderSidebar();
+        state.devices.forEach((d, i) => makeLabel(d.name, i));
+      } catch (e) {
+        console.error(e);
+        showFatal('models.json 加载失败：' + e.message);
+      }
+    }
+
+    /* ================= lil-gui 控制面板 ================= */
+    const params = {
+      autoRotate: false, autoRotateSpeed: 2,
+      wireframe: false,
+      background: '#141a26', exposure: 1.0,
+      resetView: () => {
+        if (state.mode === Mode.DETAIL && state.selectedIndex >= 0) {
+          const v = detailView(state.selectedIndex);
+          flyTo(v.pos, v.tgt, 700);
+        } else {
+          const v = overviewView();
+          flyTo(v.pos, v.tgt, 700);
+        }
+      }
+    };
+    const gui = new GUI({ title: '控制面板' });
+    const vf = gui.addFolder('视图');
+    vf.add(params, 'resetView').name('重置视角');
+    vf.add(params, 'autoRotate').name('自动旋转').onChange(v => { controls.autoRotate = v; });
+    vf.add(params, 'autoRotateSpeed', 0, 10, 0.1).name('旋转速度').onChange(v => { controls.autoRotateSpeed = v; });
+    const mf = gui.addFolder('模型');
+    mf.add(params, 'wireframe').name('线框').onChange(on => {
+      if (state.highModel) {
+        state.highModel.traverse(o => {
+          if (o.isMesh && o.material) {
             const mats = Array.isArray(o.material) ? o.material : [o.material];
-            mats.forEach(m => m.dispose());
+            mats.forEach(m => { if (m) { m.wireframe = on; m.needsUpdate = true; } });
           }
         });
       }
-      modelGroup = object;
-      originalColors = null; // 新模型，清空原色缓存
-      if (clayModeActive) { backupMaterials = null; clayModeActive = false; } // 旧材质备份作废
-      scene.add(modelGroup);
-      modelNameEl.textContent = name;
-      modelLabel.style.display = 'block';
-      applyWireframe(params.wireframe); // 保持控制面板中的线框开关状态
-      if (params.colorize) { storeOriginalColors(); applyModelColor(params.modelColor); }
-      if (params.clayMode) enableClayMode();
-      frameModel();
-    }
-
-    function showMessage(html, isError) {
-      loadPhase = isError ? 'error' : loadPhase;
-      overlay.innerHTML = '';
-      const div = document.createElement('div');
-      div.className = 'msg' + (isError ? ' error' : '');
-      div.innerHTML = html;
-      overlay.appendChild(div);
-      overlay.style.display = 'flex';
-    }
-
-    function hideOverlay() {
-      loadPhase = 'done';
-      overlay.style.display = 'none';
-      overlay.innerHTML = '';
-    }
-
-    function onModelLoaded(gltf, name) {
-      const obj = gltf.scene || gltf.scenes[0];
-      setModel(obj, name);
-      hideOverlay();
-    }
-
-    function onModelError(err, name) {
-      console.error(err);
-      const detail = err && err.message ? err.message : String(err);
-      const isMissing = /404|Failed to fetch|Load failed|not found/i.test(detail);
-      showMessage(
-        '无法加载 <b>' + escapeHtml(name) + '</b><br>' +
-        '<span class="small">' +
-        (isMissing
-          ? '模型数据不存在。请确认 model.glb 已放到网页所在目录，然后重启服务器。'
-          : escapeHtml(detail)) +
-        '<br>注意：必须通过本地服务器访问（双击运行 <code>启动.bat</code> 或 <code>启动-分享.bat</code>）。</span>',
-        true
-      );
-    }
-
-    function loadModel(url, name) {
-      setPhase('加载模型', name);
-      showMessage('正在加载 ' + escapeHtml(name) + ' ...');
-      // 优先使用内嵌模型（服务器启动时自动从 model.glb 生成）：
-      // 纯内存解析、零网络请求，任何浏览器/微信都不会卡在模型加载上
-      if (window.__EMBEDDED_GLB) {
-        try {
-          const bin = atob(window.__EMBEDDED_GLB);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          loader.parse(bytes.buffer, '', gltf => onModelLoaded(gltf, name), err => onModelError(err, name));
-        } catch (e) {
-          onModelError(e, name);
-        }
-        return;
-      }
-      loader.load(url, gltf => onModelLoaded(gltf, name), undefined, err => onModelError(err, name));
-    }
-
-    // 拖拽加载
-    let dragDepth = 0;
-    window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; app.classList.add('dragging'); });
-    window.addEventListener('dragleave', e => { e.preventDefault(); if (--dragDepth <= 0) { dragDepth = 0; app.classList.remove('dragging'); } });
-    window.addEventListener('dragover', e => e.preventDefault());
-    window.addEventListener('drop', e => {
-      e.preventDefault(); dragDepth = 0; app.classList.remove('dragging');
-      const file = [...e.dataTransfer.files].find(f => /\.(glb)$/i.test(f.name));
-      if (!file) return;
-      loadModel(URL.createObjectURL(file), file.name);
     });
+    const rf = gui.addFolder('渲染');
+    rf.addColor(params, 'background').name('背景色').onChange(v => { sceneLow.background = new THREE.Color(v); });
+    rf.add(params, 'exposure', 0.2, 3, 0.01).name('曝光').onChange(v => { rendererLow.toneMappingExposure = v; rendererHigh.toneMappingExposure = v; });
+    vf.open(); mf.open(); rf.open();
 
-    // ---------- 智能获取分享链接 ----------
-    // 本地/局域网访问（localhost、127.0.0.1、192.168.x 等）→ 自动替换为公网地址；
-    // 公网地址未就绪时返回 null（界面显示"生成中"，绝不返回本地/过期地址）
-    function isLocalUrl(url) {
-      return /localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|192\.168\.|^https?:\/\/10\.|^https?:\/\/172\.(1[6-9]|2\d|3[01])\./i.test(url);
-    }
-
-    function getShareUrl() {
-      const current = window.location.href;
-      if (isLocalUrl(current)) {
-        const pub = window.__LIVE_PUBLIC_URL || window.__SHARE_PUBLIC_URL;
-        if (pub && !isLocalUrl(pub) && /^https:\/\//i.test(pub)) return pub;
-        return null; // 公网地址未就绪
-      }
-      return current;
-    }
-
-    // 分享：复制链接 + 二维码
-    const shareBtn = document.getElementById('share-btn');
-    const sharePanel = document.getElementById('share-panel');
-    const shareUrl = document.getElementById('share-url');
-    const shareNote = document.getElementById('share-note');
-
-    function shareCopyFeedback(ok) {
-      const b = document.getElementById('share-copy');
-      const old = b.textContent;
-      b.textContent = ok ? '✓ 已复制' : '复制失败，请手动选中复制';
-      setTimeout(() => { b.textContent = old; }, 1500);
-    }
-
-    // 统一二维码渲染：先清空容器 → 新建 canvas → 生成（防止旧二维码残留）
-    function clearQR() {
-      const wrap = document.getElementById('share-qr-wrap');
-      wrap.innerHTML = '';
-    }
-
-    function renderQR(url, done) {
-      const wrap = document.getElementById('share-qr-wrap');
-      wrap.innerHTML = '';
-      const canvas = document.createElement('canvas');
-      canvas.id = 'share-qr';
-      canvas.width = 180;
-      canvas.height = 180;
-      wrap.appendChild(canvas);
-      window.__loadQR(QR => {
-        if (QR) {
-          try {
-            if (typeof QR.toCanvas === 'function') {
-              QR.toCanvas(canvas, url, { width: 180, margin: 1, errorCorrectionLevel: 'M' });
-            } else if (typeof QR === 'function') {
-              // davidshimjs/qrcodejs 风格: new QRCode(容器, { text })
-              new QR(canvas, { text: url, width: 180, height: 180 });
-            }
-            if (done) done(true);
-          } catch (e) {
-            console.warn('二维码生成失败', e);
-            if (done) done(false);
-          }
-        } else if (done) {
-          done(false);
-        }
-      });
-    }
-
-    // 本地环境黄色警告（localhost / 127.0.0.1 时显示）
-    function updateShareWarn() {
-      const warn = document.getElementById('share-warn');
-      if (warn) warn.style.display = isLocalUrl(location.href) ? 'block' : 'none';
-    }
-
-    // 刷新分享面板（链接输入框 + 二维码 + 模式提示）
-    function refreshSharePanel() {
-      updateShareWarn();
-      const url = getShareUrl();
-      if (!url) {
-        // 公网地址未就绪：15 秒内显示"生成中"，超时切换为本地预览模式提示
-        shareUrl.value = '';
-        shareUrl.placeholder = '公网地址生成中…';
-        shareNote.textContent = (Date.now() - shareWaitStart > 15000)
-          ? '当前为本地预览模式：请使用 cpolar 或 ngrok 映射端口后刷新，或把链接粘贴到下方输入框手动生成。'
-          : '公网隧道尚未就绪（首次启动需 10~30 秒），地址就绪后会自动填入，无需刷新页面。';
-        clearQR();
-        return;
-      }
-      shareUrl.value = url;
-      shareUrl.placeholder = '';
-      shareNote.textContent = isLocalUrl(location.href)
-        ? '当前为本地访问，链接已自动替换为公网地址，直接发送即可。'
-        : '当前已是公网环境，发送当前链接即可。';
-      renderQR(url, ok => {
-        if (!ok) shareNote.textContent = '二维码组件加载失败（可能离线），请使用下方手动生成或直接复制链接。';
-      });
-    }
-
-    function showShareToast(text) {
-      let t = document.getElementById('share-toast');
-      if (!t) {
-        t = document.createElement('div');
-        t.id = 'share-toast';
-        t.style.cssText = 'position:fixed;bottom:64px;right:14px;z-index:40;background:#3d6cff;color:#fff;' +
-          'padding:8px 14px;border-radius:8px;font:12px "Segoe UI","Microsoft YaHei",sans-serif;' +
-          'box-shadow:0 4px 14px rgba(0,0,0,.4);opacity:0;transition:opacity .3s;';
-        document.body.appendChild(t);
-      }
-      t.textContent = text;
-      t.style.opacity = '1';
-      clearTimeout(t._timer);
-      t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
-    }
-
-    // ---------- 分享地址自动更新（无需刷新网页） ----------
-    // 每次重新点击「启动.bat」，隧道重启后公网地址会变化；
-    // 本页面定时从本地服务器读取最新地址（current-url.txt），自动更新分享链接与二维码。
-    // 隧道重启期间（current-url.txt 被清除/404）会立即作废旧地址，避免复制到失效链接。
-    window.__LIVE_PUBLIC_URL = null;
-    window.__TUNNEL_STATUS = '';
-    const shareWaitStart = Date.now();
-
-    function invalidateShareUrl() {
-      if (window.__LIVE_PUBLIC_URL || window.__SHARE_PUBLIC_URL) {
-        window.__LIVE_PUBLIC_URL = null;
-        window.__SHARE_PUBLIC_URL = '';
-        console.warn('[GLB Viewer] 公网地址已作废（隧道重启中）');
-        if (sharePanel.style.display === 'block') refreshSharePanel();
-      }
-    }
-
-    // 显示"生成中/本地预览"状态（含隧道诊断信息）
-    function showSharePending() {
-      if (sharePanel.style.display !== 'block') return;
-      if (getShareUrl()) return; // 已有地址，不覆盖
-      updateShareWarn();
-      let msg;
-      if (Date.now() - shareWaitStart > 15000) {
-        msg = '当前为本地预览模式：请使用 cpolar 或 ngrok 映射端口后刷新，或把链接粘贴到下方输入框手动生成。';
-        if (window.__TUNNEL_STATUS) msg += '（' + window.__TUNNEL_STATUS + '）';
-      } else {
-        msg = window.__TUNNEL_STATUS
-          ? '公网隧道状态：' + window.__TUNNEL_STATUS
-          : '公网隧道尚未就绪（首次启动需 10~30 秒）…';
-      }
-      if (shareNote.textContent !== msg) shareNote.textContent = msg;
-    }
-
-    async function pollPublicUrl() {
-      // 读取隧道状态说明（share.ps1 写入），用于诊断
-      try {
-        const s = await fetch('http://127.0.0.1:8000/tunnel-status.txt', { cache: 'no-store' });
-        if (s.ok) window.__TUNNEL_STATUS = (await s.text()).trim();
-      } catch (e) { /* 忽略 */ }
-      try {
-        const r = await fetch('http://127.0.0.1:8000/current-url.txt', { cache: 'no-store' });
-        if (!r.ok) { invalidateShareUrl(); showSharePending(); return; } // 文件被清除 = 隧道重启中
-        const u = (await r.text()).trim();
-        if (!u) { invalidateShareUrl(); showSharePending(); return; }
-        if (u !== window.__LIVE_PUBLIC_URL) {
-          window.__LIVE_PUBLIC_URL = u;
-          window.__SHARE_PUBLIC_URL = u; // 动态覆盖为最新公网地址
-          console.log('[GLB Viewer] 分享地址自动更新为:', u);
-          if (sharePanel.style.display === 'block') refreshSharePanel();
-          else showShareToast('分享地址已更新，点「分享」查看新链接');
-        }
-      } catch (e) {
-        showSharePending(); // 本地服务器不可达时也保持提示
-      }
-    }
-    setTimeout(pollPublicUrl, 1500);   // 打开页面后先查一次
-    setInterval(pollPublicUrl, 5000);  // 之后每 5 秒检查一次
-
-    shareBtn.addEventListener('click', () => {
-      const show = sharePanel.style.display !== 'block';
-      sharePanel.style.display = show ? 'block' : 'none';
-      if (show) { updateShareWarn(); refreshSharePanel(); }
-    });
-
-    // 手动生成二维码（自动获取失败时的备用方案）
-    document.getElementById('share-manual-btn').addEventListener('click', () => {
-      const manual = document.getElementById('share-manual').value.trim();
-      if (!manual) { showShareToast('请先粘贴公网链接'); return; }
-      shareUrl.value = manual;
-      renderQR(manual, ok => {
-        if (ok) {
-          showShareToast('已生成二维码');
-          shareNote.textContent = '已使用手动输入的链接生成二维码，可直接复制发送。';
-        } else {
-          showShareToast('二维码生成失败，请检查链接格式');
-        }
-      });
-    });
-
-    document.getElementById('share-copy').addEventListener('click', () => {
-      // 优先自动获取的地址；没有则用手动输入框里的链接
-      const manual = document.getElementById('share-manual').value.trim();
-      const url = getShareUrl() || manual || null;
-      if (!url) {
-        showShareToast('公网地址尚未就绪，请稍候几秒再复制');
-        return; // 不复制本地/无效地址
-      }
-      shareUrl.value = url;
-      shareUrl.select();
-      let ok = false;
-      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(() => shareCopyFeedback(true)).catch(() => shareCopyFeedback(ok));
-      } else {
-        shareCopyFeedback(ok);
-      }
-    });
-
-    // ---------- lil-gui 控制面板 ----------
-    const params = {
-      wireframe: false,
-      grid: false,
-      colorize: false,
-      modelColor: '#4da3ff',
-      clayMode: false,
-      clayRoughness: 0.6,
-      clayMetalness: 0.0,
-      autoRotate: false,
-      autoRotateSpeed: 2,
-      fov: camera.fov,
-      toneMapping: 'ACESFilmic',
-      exposure: renderer.toneMappingExposure,
-      background: '#b1cdec',
-      resetView: frameModel,
-    };
-
-    const gui = new GUI({ title: 'GLB Viewer 控制面板' });
-
-    const viewFolder = gui.addFolder('视图');
-    viewFolder.add(params, 'resetView').name('重置视角');
-    viewFolder.add(params, 'autoRotate').name('自动旋转').onChange(v => { controls.autoRotate = v; });
-    viewFolder.add(params, 'autoRotateSpeed', 0, 10, 0.1).name('旋转速度').onChange(v => { controls.autoRotateSpeed = v; });
-    viewFolder.add(params, 'fov', 20, 120, 1).name('视野 FOV').onChange(v => { camera.fov = v; camera.updateProjectionMatrix(); });
-
-    const modelFolder = gui.addFolder('模型');
-    modelFolder.add(params, 'wireframe').name('线框').onChange(applyWireframe);
-    modelFolder.add(params, 'grid').name('参考网格').onChange(v => { grid.visible = v; });
-    modelFolder.add(params, 'colorize').name('模型着色').onChange(v => {
-      if (v) { storeOriginalColors(); applyModelColor(params.modelColor); }
-      else { restoreModelColors(); }
-    });
-    modelFolder.addColor(params, 'modelColor').name('模型颜色').onChange(v => {
-      if (params.clayMode) { updateClayMaterial(); return; }
-      if (params.colorize) applyModelColor(v);
-    });
-    modelFolder.add(params, 'clayMode').name('白膜模式').onChange(v => {
-      if (v) enableClayMode(); else disableClayMode();
-    });
-    modelFolder.add(params, 'clayRoughness', 0, 1, 0.01).name('白膜粗糙度').onChange(updateClayMaterial);
-    modelFolder.add(params, 'clayMetalness', 0, 1, 0.01).name('白膜金属度').onChange(updateClayMaterial);
-
-    const renderFolder = gui.addFolder('渲染');
-    renderFolder.add(params, 'toneMapping', ['ACESFilmic', 'Neutral', 'NoToneMapping']).name('色调映射').onChange(v => {
-      renderer.toneMapping = v === 'NoToneMapping' ? THREE.NoToneMapping
-                          : (v === 'Neutral' ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping);
-    });
-    renderFolder.add(params, 'exposure', 0.2, 3, 0.01).name('曝光').onChange(v => { renderer.toneMappingExposure = v; });
-    renderFolder.addColor(params, 'background').name('背景色').onChange(v => { scene.background = new THREE.Color(v); });
-
-    viewFolder.open();
-    modelFolder.open();
-    renderFolder.open();
-
-    // ---------- 渲染循环 ----------
-    renderer.setAnimationLoop(() => {
+    /* ================= 渲染循环 / 自适应 / 快捷键 ================= */
+    rendererLow.setAnimationLoop(() => {
       controls.update();
-      renderer.render(scene, camera);
+      rendererLow.render(sceneLow, camera);
+      rendererHigh.render(sceneHigh, camera);
     });
-
     window.addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
+      rendererLow.setSize(innerWidth, innerHeight);
+      rendererHigh.setSize(innerWidth, innerHeight);
+    });
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && state.mode === Mode.DETAIL) exitDetail();
+    });
+    document.getElementById('back-btn').addEventListener('click', exitDetail);
+    document.getElementById('share-btn').addEventListener('click', () => {
+      const url = location.href;
+      const done = () => { const b = document.getElementById('share-btn'); b.textContent = '✓ 已复制'; setTimeout(() => b.textContent = '复制链接', 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done);
+      else { const ta = document.createElement('textarea'); ta.value = url; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
     });
 
-    // ---------- 启动：加载 model.glb ----------
-    loadModel('model.glb', 'model.glb');
+    // 启动：全景视角就位后渲染设备全景
+    const v0 = overviewView();
+    camera.position.copy(v0.pos);
+    controls.target.copy(v0.tgt);
+    controls.minDistance = 2;
+    controls.maxDistance = 40;
+    controls.update();
+    init();
   </script>
 </body>
 </html>

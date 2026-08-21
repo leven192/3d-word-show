@@ -60,7 +60,27 @@ if (Test-Path $glb) {
 Copy-Item (Join-Path $root 'index.html') (Join-Path $dist 'index.html')
 if (Test-Path $glb) { Copy-Item $glb (Join-Path $dist 'model.glb') }
 
-# 5) 上传说明
+# 5) 多设备配置与模型目录（models.json + models/ + thumbs/）
+$cfg = Join-Path $root 'models.json'
+if (Test-Path $cfg) {
+    Copy-Item $cfg (Join-Path $dist 'models.json')
+    Write-Host "已复制 models.json（设备清单）"
+} else {
+    Write-Host "缺少 models.json —— 页面将无法显示设备列表" -ForegroundColor Yellow
+    $ok = $false
+}
+$modelsDir = Join-Path $root 'models'
+if (Test-Path $modelsDir) {
+    Copy-Item $modelsDir (Join-Path $dist 'models') -Recurse -Force
+    Write-Host "已复制 models/ 目录（device-02..10 模型）"
+}
+$thumbsDir = Join-Path $root 'thumbs'
+if (Test-Path $thumbsDir) {
+    Copy-Item $thumbsDir (Join-Path $dist 'thumbs') -Recurse -Force
+    Write-Host "已复制 thumbs/ 目录（缩略图）"
+}
+
+# 6) 上传说明
 $readme = @"
 ============================================
   发布包已生成！把「发布」文件夹里的全部内容
@@ -86,15 +106,20 @@ $readme = @"
     但国内访问可能不稳定）
 
 【更新模型】
-  导出新的 model.glb 后：重新双击「生成发布包.bat」，
-  把发布目录里更新的 index.html / model-embedded.js / model.glb
-  覆盖上传到托管服务即可（只传这 3 个文件也行）。
+  1. 设备 1：导出新的 model.glb 后重新生成发布包即可（「启动.bat」会自动部署）
+  2. 设备 2~10：把 C4D 导出的 GLB 放到 models/ 文件夹，
+     命名对应 models.json 里的路径（如 models/device-02.glb），
+     然后重新生成发布包并上传/部署
+  3. 缩略图：把图片放到 thumbs/ 文件夹，并在 models.json 里填写
+     thumbnail 路径；不填则页面自动显示编号占位图
 
 【注意事项】
   - 部署后页面会自动把当前访问地址作为分享链接，
     无需再配置 cpolar 公网地址
   - 微信打开若提示拦截，点右上角「在浏览器中打开」即可
   - 首次打开会加载 lib/ 库（约 300KB gzip），正常网络几秒完成
+  - 切换设备时按需加载 GLB，自动释放上一台设备的内存；
+    模型缺失会提示「模型加载失败」，不影响其他设备浏览
 "@
 [System.IO.File]::WriteAllText((Join-Path $dist '上传说明.txt'), $readme, (New-Object System.Text.UTF8Encoding($true)))
 
