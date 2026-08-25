@@ -2,8 +2,12 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
+  <!-- NAIGU EXPO V1.5: fogFar=120 exposure=0.5 no-wireframe -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>3D 设备层级下钻系统</title>
+  <title>耐锢科技线上展厅</title>
+  <!-- 正式 Logo favicon（logo2.png 生成，版本号强制刷新缓存） -->
+  <link rel="icon" type="image/png" href="favicon.png?v=20260823" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20260823" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
@@ -20,9 +24,9 @@
     #app canvas { position: absolute; inset: 0; display: block; }
     #low-canvas  { z-index: 1; pointer-events: none; transition: filter .7s ease, transform .7s ease; }
     #high-canvas { z-index: 2; pointer-events: auto; }
-    /* 背景虚化：详情模式下底层全景变模糊+变暗，突出顶层特写 */
+    /* 背景虚化：详情模式下底层全景变模糊，聚焦特写模型（深蓝灰背景保持原亮度） */
     #app.blur #low-canvas {
-      filter: blur(12px) brightness(.5) saturate(.6);
+      filter: blur(12px) brightness(.9);
       transform: scale(1.06);
     }
 
@@ -108,6 +112,20 @@
       display: flex; flex-direction: column;
     }
     #device-panel h3 { color: #c9d2e0; font-size: 14px; font-weight: 600; padding: 14px 14px 10px; }
+    /* 品牌（左上角：正式 Logo 图片 + 公司名） */
+    #brand {
+      display: flex; align-items: center; gap: 8px;
+      padding: 14px 14px 4px;
+      height: 44px;                      /* 与侧栏标题行高一致，垂直居中 */
+      box-sizing: content-box;
+    }
+    .logo-img { height: 26px; width: auto; flex: none; }   /* 正式 Logo 图片 */
+    .logo-text {
+      color: #2b2b2b; font-size: 15px; font-weight: 700;        /* 深灰黑粗体 */
+      font-family: "Microsoft YaHei", "PingFang SC", "Heiti SC", sans-serif;
+      letter-spacing: 1px; white-space: nowrap;
+    }
+    @media (max-width: 768px) { #brand { display: none; } }
     #device-list { flex: 1; overflow-y: auto; padding: 0 10px 14px; }
     .device-tile {
       background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
@@ -190,13 +208,52 @@
 
     .lg { z-index: 5 !important; }
   </style>
+  <!-- 兼容性检测（所有浏览器都会执行，早于 module 脚本）：
+       老内核微信不支持 ES module/WebGL → 显示引导层，避免白屏困惑 -->
+  <script>
+    (function () {
+      try {
+        var supportsModules = 'noModule' in document.createElement('script');
+        var cv = document.createElement('canvas');
+        var supportsWebGL = !!(window.WebGLRenderingContext && (cv.getContext('webgl') || cv.getContext('experimental-webgl')));
+        var isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+        var issues = [];
+        if (!supportsModules) issues.push('当前浏览器版本过旧（不支持 3D 页面加载）');
+        if (!supportsWebGL) issues.push('WebGL 3D 渲染不可用');
+        if (issues.length) {
+          var layer = document.createElement('div');
+          layer.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f5f7fa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:"Microsoft YaHei",sans-serif;text-align:center;padding:24px;';
+          layer.innerHTML =
+            '<div style="font-size:18px;font-weight:600;color:#1f2937;">无法显示 3D 展厅</div>' +
+            '<div style="font-size:14px;color:#6b7280;">' + issues.join('；') + '</div>' +
+            '<div style="font-size:13px;color:#6b7280;line-height:1.9;">' +
+            (isWeChat
+              ? '请点击右上角「···」→ 选择「在浏览器中打开」<br>使用 Chrome / Safari 打开即可正常浏览'
+              : '请使用最新版 Chrome / Safari / Edge 浏览器打开') +
+            '</div>';
+          document.body.appendChild(layer);
+          return;
+        }
+        if (isWeChat) {
+          // 微信内但可用：顶部轻提示，引导去浏览器获得最佳体验（可关闭）
+          var bar = document.createElement('div');
+          bar.id = 'wx-tip';
+          bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;background:rgba(46,91,255,.93);color:#fff;font:12px "Microsoft YaHei",sans-serif;padding:9px 34px 9px 12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+          bar.innerHTML = '3D 展厅建议点右上角「···」→「在浏览器中打开」体验最佳 <span id="wx-tip-close" style="position:absolute;right:10px;top:6px;cursor:pointer;font-size:14px;">✕</span>';
+          document.body.appendChild(bar);
+          document.getElementById('wx-tip-close').addEventListener('click', function () { bar.remove(); });
+        }
+      } catch (e) { /* 检测失败不阻塞页面 */ }
+    })();
+  </script>
 </head>
 <body>
   <div id="app"></div>
 
-  <div id="hint">设备全景 · 点击任意设备下钻查看详情</div>
+  <div id="hint">耐锢科技线上展厅 · 点击设备查看详情</div>
 
   <div id="device-panel">
+    <div id="brand"><img class="logo-img" src="logo2.png" alt="耐锢科技" /><span class="logo-text">耐锢科技</span></div>
     <h3>设备列表</h3>
     <div id="device-list"></div>
   </div>
@@ -256,7 +313,7 @@
 
   <script type="module">
     /* ============================================================
-     *  层级下钻 3D 展示系统
+     *  耐锢科技线上展厅（3D 设备层级下钻展示）
      *  状态机：OVERVIEW(全景) -> TRANSITION(飞行/加载) -> DETAIL(详情)
      *          DETAIL -> TRANSITION -> OVERVIEW（返回）
      *  内存管理：全景低模 = 常驻 InstancedMesh（共享几何体/材质，永不重建）
@@ -274,15 +331,19 @@
     }
 
     // ---------- 加载 three.js（本地优先，CDN 回退） ----------
-    let THREE, OrbitControls, GLTFLoader, GUI;
+    let THREE, OrbitControls, GLTFLoader, GUI, EffectComposer, RenderPass, UnrealBloomPass;
     try {
       THREE = await import('./lib/three.module.js');
       OrbitControls = (await import('./lib/OrbitControls.js')).OrbitControls;
       GLTFLoader = (await import('./lib/GLTFLoader.js')).GLTFLoader;
       GUI = (await import('./lib/lil-gui.esm.min.js')).default;
-      console.log('[下钻系统] 使用本地依赖');
+      // 后处理（辉光通道）：EffectComposer + RenderPass + UnrealBloomPass
+      EffectComposer = (await import('./lib/postprocessing/EffectComposer.js')).EffectComposer;
+      RenderPass = (await import('./lib/postprocessing/RenderPass.js')).RenderPass;
+      UnrealBloomPass = (await import('./lib/postprocessing/UnrealBloomPass.js')).UnrealBloomPass;
+      console.log('[线上展厅] 使用本地依赖');
     } catch (e) {
-      console.warn('[下钻系统] 本地依赖不可用，尝试 CDN', e);
+      console.warn('[线上展厅] 本地依赖不可用，尝试 CDN', e);
       let ok = false;
       for (const cdn of window.__CDNS) {
         try {
@@ -291,7 +352,10 @@
           OrbitControls = (await import('three/addons/controls/OrbitControls.js')).OrbitControls;
           GLTFLoader = (await import('three/addons/loaders/GLTFLoader.js')).GLTFLoader;
           GUI = (await import(cdn.gui)).default;
-          console.log('[下钻系统] 使用 CDN:', cdn.name);
+          EffectComposer = (await import('three/addons/postprocessing/EffectComposer.js')).EffectComposer;
+          RenderPass = (await import('three/addons/postprocessing/RenderPass.js')).RenderPass;
+          UnrealBloomPass = (await import('three/addons/postprocessing/UnrealBloomPass.js')).UnrealBloomPass;
+          console.log('[线上展厅] 使用 CDN:', cdn.name);
           ok = true;
           break;
         } catch (e2) { console.warn('CDN 失败', cdn.name, e2); }
@@ -323,8 +387,10 @@
       r.setPixelRatio(Math.min(devicePixelRatio, 2));
       r.setSize(innerWidth, innerHeight);
       r.outputColorSpace = THREE.SRGBColorSpace;
-      r.toneMapping = THREE.ACESFilmicToneMapping;   // 电影级色调映射，提升清晰立体感
-      r.toneMappingExposure = 1.0;
+      r.toneMapping = THREE.ACESFilmicToneMapping;   // 电影级色调映射
+      r.toneMappingExposure = 0.5;                   // 默认最小曝光（gui 可调 0.5~2.5）
+      r.shadowMap.enabled = true;                    // 阴影（主光源投射，体现体积感）
+      r.shadowMap.type = THREE.PCFSoftShadowMap;
       r.domElement.id = id;
       app.appendChild(r.domElement);
       return r;
@@ -340,97 +406,132 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
 
-    /* ================= 全景场景（低模，常驻） ================= */
-    const sceneLow = new THREE.Scene();
-    sceneLow.background = new THREE.Color(0x141a26);
+    /* ================= 全景场景（低模，常驻）—— 赛博朋克视觉 ================= */
 
-    // 灯光（两个场景共用同一套光效）
-    const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x1a2030, 1.1);
-    const keyL = new THREE.DirectionalLight(0xffffff, 2.0); keyL.position.set(6, 10, 5);
-    const fillL = new THREE.DirectionalLight(0x88aaff, 0.7); fillL.position.set(-6, 3, -5);
-    sceneLow.add(hemi, keyL, fillL);
+    // ---------- ① 背景系统（纯色可调 + 雾色联动，默认淡蓝灰摄影棚） ----------
+    function setupBackground(scene) {
+      scene.background = new THREE.Color(0xcbd5e1);   // 淡蓝灰背景墙纸（gui 可调）
+      scene.fog = new THREE.Fog(0xcbd5e1, 30, 120);    // 雾色与背景一致；默认雾化距离最大（远 120）
+    }
 
-    // 地面网格（虚化时同样变模糊，增强景深感）
-    const grid = new THREE.GridHelper(16, 20, 0x3a4a6a, 0x232e44);
-    grid.position.y = 0.01;   // 略高于地面，避免与地板 z-fight 闪烁
-    sceneLow.add(grid);
-    const floor = new THREE.Mesh(
-      new THREE.CircleGeometry(10, 64),
-      new THREE.MeshStandardMaterial({ color: 0x0d1119, roughness: 1, metalness: 0, transparent: true, opacity: .55 })
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = 0;
-    sceneLow.add(floor);
+    // ---------- ② 灯光系统（一盏舞台聚光灯，替代环境灯） ----------
+    function setupLights(scene, renderer) {
+      // 聚光灯：从上前方 (2,20,10) 照向展台中心 (0,0,0)
+      // 参数：intensity 250（物理光照）/ distance 100 / angle 0.55rad(~31°) 锥角 / penumbra 0.4 柔和边缘 / decay 1.5
+      const spot = new THREE.SpotLight(0xffffff, 250, 100, 0.55, 0.4, 1.5);
+      spot.position.set(2, 20, 10);
+      spot.target.position.set(0, 0, 0);
+      scene.add(spot, spot.target);
+      if (renderer) {
+        spot.castShadow = true;
+        spot.shadow.mapSize.set(1024, 1024);
+        spot.shadow.camera.near = 1;
+        spot.shadow.camera.far = 60;
+        spot.shadow.camera.fov = 65;    // 与锥角匹配，阴影覆盖全部设备
+        spot.shadow.camera.updateProjectionMatrix();
+        spot.shadow.bias = -0.0005;
+      }
+      return { spot };
+    }
 
+    // ---------- ③ 地面系统（哑光大理石，轻微光泽不抢视觉） ----------
+    function setupGround(scene) {
+      // 大理石地面：巨大平面 200x200，MeshPhysicalMaterial
+      // roughness 0.5 半哑光 / clearcoat 0.4 轻微清漆（无环境贴图，无反射干扰）
+      // 不添加反射盘（无"两个模型"倒影）
+      const marble = new THREE.Mesh(
+        new THREE.PlaneGeometry(200, 200),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xe0e0e0, roughness: 0.5, metalness: 0.1,
+          clearcoat: 0.4, clearcoatRoughness: 0.3
+        })
+      );
+      marble.rotation.x = -Math.PI / 2;
+      marble.position.y = 0;
+      marble.receiveShadow = true;   // 接触阴影：设备在光滑地面上的柔和落影
+      scene.add(marble);
+      return { marble };
+    }
+
+    // ---------- ④ 设备低模（直接落在大理石地面） ----------
     const N = 10;                 // 设备数量
-    const R = 5.0;                // 全景环形半径
-    const bodyMesh = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(0.85, 0.85, 0.85),
-      new THREE.MeshStandardMaterial({ roughness: .35, metalness: .6, color: 0xffffff }),
-      N
-    );
-    const baseMesh = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.5, 0.62, 0.14, 24),
-      new THREE.MeshStandardMaterial({ roughness: .5, metalness: .5, color: 0xffffff }),
-      N
-    );
-    const defaultColors = [];
-    const dummy = new THREE.Object3D();
-    const devicePositions = [];   // 每台设备的全景坐标
-    const palette = [0x4da3ff, 0x5fd08a, 0xffc46b, 0xff8a5c, 0xc46bff, 0x4dd7d0, 0xff6b8a, 0x8aff6b, 0x6b8aff, 0xffb34d];
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      const p = new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R);
-      devicePositions.push(p);
-      // 机身
-      dummy.position.set(p.x, 0.55, p.z);
-      dummy.rotation.set(0, -a + Math.PI / 2, 0);
-      dummy.updateMatrix();
-      bodyMesh.setMatrixAt(i, dummy.matrix);
-      // 底座
-      dummy.position.set(p.x, 0.07, p.z);
-      dummy.rotation.set(0, 0, 0);
-      dummy.updateMatrix();
-      baseMesh.setMatrixAt(i, dummy.matrix);
-      // 实例颜色（渐变调色板）
-      const c = new THREE.Color(palette[i]);
-      bodyMesh.setColorAt(i, c);
-      baseMesh.setColorAt(i, c.clone().multiplyScalar(0.55));
-      defaultColors.push(c);
+    const R = 5.0;                // 设备环绕半径
+    let bodyMesh, baseMesh, labels, defaultColors, devicePositions;
+    const palette = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa29bfe, 0xff8a5c, 0x55efc4, 0xff6b8a, 0x74b9ff, 0xfd79a8, 0x00cec9];
+    function setupDevices(scene) {
+      devicePositions = [];
+      // 机身/底座：反射灯光更有质感的材质（metalness 0.3 / roughness 0.4），极淡青色自发光
+      const deviceMat = new THREE.MeshStandardMaterial({
+        roughness: 0.4, metalness: 0.3, color: 0xffffff,
+        emissive: 0x00ffff, emissiveIntensity: 0.1
+      });
+      bodyMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), deviceMat, N);
+      baseMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.62, 0.14, 24), deviceMat, N);
+      bodyMesh.castShadow = true;   // 投射阴影 → 大理石地面上的接触阴影
+      baseMesh.castShadow = true;
+      defaultColors = [];
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        const p = new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R);
+        devicePositions.push(p);
+        // 机身（直接落地）
+        dummy.position.set(p.x, 0.55, p.z);
+        dummy.rotation.set(0, -a + Math.PI / 2, 0);
+        dummy.updateMatrix();
+        bodyMesh.setMatrixAt(i, dummy.matrix);
+        // 底座
+        dummy.position.set(p.x, 0.07, p.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.updateMatrix();
+        baseMesh.setMatrixAt(i, dummy.matrix);
+        // 实例颜色（区分设备）
+        const c = new THREE.Color(palette[i]);
+        bodyMesh.setColorAt(i, c);
+        baseMesh.setColorAt(i, c.clone().multiplyScalar(0.55));
+        defaultColors.push(c);
+      }
+      bodyMesh.instanceColor.needsUpdate = true;
+      baseMesh.instanceColor.needsUpdate = true;
+      scene.add(bodyMesh, baseMesh);
+      // 名称标签（Sprite 文字纹理，不受雾影响）
+      labels = [];
+      function makeLabel(text, i) {
+        const cv = document.createElement('canvas');
+        cv.width = 256; cv.height = 64;
+        const ctx = cv.getContext('2d');
+        ctx.font = 'bold 34px "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 256, 64);
+        ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 6;
+        ctx.strokeText(text, 128, 34);
+        ctx.fillStyle = '#eaf2ff'; ctx.fillText(text, 128, 34);
+        const tex = new THREE.CanvasTexture(cv);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
+        sp.scale.set(2.2, 0.55, 1);
+        sp.position.set(devicePositions[i].x, 1.85, devicePositions[i].z);
+        sp.userData.deviceId = i;
+        sp.renderOrder = 10;
+        labels.push(sp);
+        scene.add(sp);
+      }
+      return makeLabel;
     }
-    bodyMesh.instanceColor.needsUpdate = true;
-    baseMesh.instanceColor.needsUpdate = true;
-    sceneLow.add(bodyMesh, baseMesh);
 
-    // 名称标签（Sprite 文字纹理）
-    const labels = [];
-    function makeLabel(text, i) {
-      const cv = document.createElement('canvas');
-      cv.width = 256; cv.height = 64;
-      const ctx = cv.getContext('2d');
-      ctx.font = 'bold 34px "Microsoft YaHei", sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 256, 64);
-      ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 6;
-      ctx.strokeText(text, 128, 34);
-      ctx.fillStyle = '#eaf2ff'; ctx.fillText(text, 128, 34);
-      const tex = new THREE.CanvasTexture(cv);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-      sp.scale.set(2.2, 0.55, 1);
-      sp.position.set(devicePositions[i].x, 1.85, devicePositions[i].z);
-      sp.userData.deviceId = i;
-      sp.renderOrder = 10;
-      labels.push(sp);
-      sceneLow.add(sp);
-    }
+    /* ================= 全景场景初始化（模块化组合） ================= */
+    const sceneLow = new THREE.Scene();
+    setupBackground(sceneLow);
+    setupGround(sceneLow);
+    setupLights(sceneLow, rendererLow);      // 一盏聚光灯 + 阴影
+    const makeLabel = setupDevices(sceneLow);
 
     /* ================= 高模场景（详情，动态加载/卸载） ================= */
     const sceneHigh = new THREE.Scene();
-    // 独立灯光副本（object3D 同一时刻只能有一个 parent，不能复用全景灯光）
-    const hHemi = new THREE.HemisphereLight(0xdfe8ff, 0x1a2030, 1.1);
-    const hKey = new THREE.DirectionalLight(0xffffff, 2.2); hKey.position.set(6, 10, 5);
-    const hFill = new THREE.DirectionalLight(0x88aaff, 0.7); hFill.position.set(-6, 3, -5);
-    sceneHigh.add(hHemi, hKey, hFill);
+    // 详情照明：同样一盏聚光灯（object3D 同一时刻只能有一个 parent，故独立创建），指向模型中心
+    const hSpot = new THREE.SpotLight(0xffffff, 200, 60, 0.6, 0.3, 1.5);
+    hSpot.position.set(4, 12, 6);
+    hSpot.target.position.set(0, 0.3, 0);
+    sceneHigh.add(hSpot, hSpot.target);
 
     const loader = new GLTFLoader();
 
@@ -453,7 +554,7 @@
       sceneHigh.remove(state.highModel);
       disposeObject(state.highModel);
       state.highModel = null;
-      console.log('[下钻系统] 已卸载高精度模型，内存已释放');
+      console.log('[线上展厅] 已卸载高精度模型，内存已释放');
     }
 
     /* ================= 相机飞行（平滑缓动） ================= */
@@ -478,7 +579,9 @@
 
     // 全景视角 / 详情特写视角
     function overviewView() {
-      return { pos: new THREE.Vector3(0, 7.5, 13), tgt: new THREE.Vector3(0, 0, 0) };
+      // 初始视角：相机在 z+ 前方 (0,2.5,8)，视线焦点正对前排设备组中心 (0,0.8,3.8)
+      // → 打开画面中央即离相机最近的近处前排设备，后排设备在画面边缘
+      return { pos: new THREE.Vector3(0, 2.5, 8), tgt: new THREE.Vector3(0, 0.8, 3.8) };
     }
     function detailView(i) {
       const p = devicePositions[i];
@@ -649,7 +752,7 @@
       state.mode = Mode.DETAIL;
       document.body.classList.add('in-detail');   // 隐藏侧栏/分享，面板独占左下角
       document.getElementById('hint').classList.add('hidden');
-      console.log('[下钻系统] 进入详情模式:', device.name);
+      console.log('[线上展厅] 进入详情模式:', device.name);
     }
 
     async function exitDetail() {
@@ -677,9 +780,11 @@
       setLoading(false);
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.OVERVIEW;
+      controls.minDistance = 4;   // 返回全景：恢复全景缩放范围（详情模式由 fitDetailView 设置）
+      controls.maxDistance = 80;
       document.body.classList.remove('in-detail');  // 恢复侧栏与分享按钮
       document.getElementById('hint').classList.remove('hidden');
-      console.log('[下钻系统] 返回全景模式');
+      console.log('[线上展厅] 返回全景模式');
     }
 
     // 特写取景：①模型居中（旋转中心=模型中心，触控流畅的关键）
@@ -764,7 +869,7 @@
         state.devices.forEach((d, i) => makeLabel(d.name, i));
         // 全景低模已就绪（不依赖任何 GLB），隐藏加载遮罩
         setLoading(false);
-        console.log('[下钻系统] 全景就绪，共 ' + state.devices.length + ' 台设备');
+        console.log('[线上展厅] 全景就绪，共 ' + state.devices.length + ' 台设备');
       } catch (e) {
         console.error(e);
         showFatal('models.json 加载失败：' + e.message);
@@ -773,9 +878,9 @@
 
     /* ================= lil-gui 控制面板 ================= */
     const params = {
-      autoRotate: false, autoRotateSpeed: 2,
-      wireframe: false,
-      background: '#141a26', exposure: 1.0,
+      autoRotate: true, autoRotateSpeed: 0.6,
+      bloom: true, fogFar: 120, showFPS: false,
+      exposure: 0.5,
       resetView: () => {
         if (state.mode === Mode.DETAIL && state.selectedIndex >= 0) {
           const v = detailView(state.selectedIndex);
@@ -791,33 +896,64 @@
     vf.add(params, 'resetView').name('重置视角');
     vf.add(params, 'autoRotate').name('自动旋转').onChange(v => { controls.autoRotate = v; });
     vf.add(params, 'autoRotateSpeed', 0, 10, 0.1).name('旋转速度').onChange(v => { controls.autoRotateSpeed = v; });
-    const mf = gui.addFolder('模型');
-    mf.add(params, 'wireframe').name('线框').onChange(on => {
-      if (state.highModel) {
-        state.highModel.traverse(o => {
-          if (o.isMesh && o.material) {
-            const mats = Array.isArray(o.material) ? o.material : [o.material];
-            mats.forEach(m => { if (m) { m.wireframe = on; m.needsUpdate = true; } });
-          }
-        });
-      }
-    });
     const rf = gui.addFolder('渲染');
-    rf.addColor(params, 'background').name('背景色').onChange(v => { sceneLow.background = new THREE.Color(v); });
-    rf.add(params, 'exposure', 0.2, 3, 0.01).name('曝光').onChange(v => { rendererLow.toneMappingExposure = v; rendererHigh.toneMappingExposure = v; });
-    vf.open(); mf.open(); rf.open();
+    rf.add(params, 'bloom', true).name('辉光 (UnrealBloom)').onChange(v => { bloomPass.enabled = v; });
+    rf.add(params, 'fogFar', 20, 120, 2).name('雾化距离(结束)').onChange(v => { sceneLow.fog.far = v; });
+    rf.add(params, 'showFPS', false).name('显示 FPS').onChange(v => {
+      if (!fpsEl) {
+        fpsEl = document.createElement('div');
+        fpsEl.style.cssText = 'position:fixed;top:10px;right:10px;z-index:50;color:#8fd0ff;font:12px monospace;background:rgba(0,0,0,.5);padding:3px 8px;border-radius:6px;pointer-events:none;';
+        document.body.appendChild(fpsEl);
+      }
+      fpsEl.style.display = v ? 'block' : 'none';
+    });
+    rf.add(params, 'exposure', 0.5, 2.5, 0.01).name('曝光').onChange(v => { rendererLow.toneMappingExposure = v; rendererHigh.toneMappingExposure = v; });
+    vf.open(); rf.open();
+
+    /* ================= 显式应用默认参数（防缓存/时序问题，打开即生效） ================= */
+    // 默认最大雾化距离（far=120，滑条上限）+ 最小曝光（0.5，滑条下限）
+    sceneLow.fog.near = 30;
+    sceneLow.fog.far = params.fogFar;
+    rendererLow.toneMappingExposure = params.exposure;
+    rendererHigh.toneMappingExposure = params.exposure;
+    console.log('[线上展厅] 默认参数已应用: 雾化距离=' + sceneLow.fog.far + ' 曝光=' + params.exposure + ' (NAIGU EXPO V1.5)');
+
+    /* ================= 后处理：辉光通道（仅全景底层，极克制防过曝） ================= */
+    // UnrealBloomPass：strength 0.15（极弱光晕）/ radius 0.4 / threshold 1.0（仅超亮处发光）
+    // 避免发光部分过曝导致模型本体看不清；分辨率取屏幕一半兼顾移动端
+    const composer = new EffectComposer(rendererLow);
+    composer.addPass(new RenderPass(sceneLow, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(Math.floor(innerWidth / 2), Math.floor(innerHeight / 2)),
+      0.15, 0.4, 1.0
+    );
+    composer.addPass(bloomPass);
+
+    /* ================= FPS 统计（性能测试用） ================= */
+    let fpsEl = null, fpsFrames = 0, fpsLast = performance.now();
+    function updateFPS(now) {
+      fpsFrames++;
+      if (now - fpsLast >= 500) {
+        const fps = Math.round(fpsFrames * 1000 / (now - fpsLast));
+        fpsFrames = 0; fpsLast = now;
+        if (fpsEl) fpsEl.textContent = 'FPS: ' + fps;
+      }
+    }
 
     /* ================= 渲染循环 / 自适应 / 快捷键 ================= */
     rendererLow.setAnimationLoop(() => {
       controls.update();
-      rendererLow.render(sceneLow, camera);
-      rendererHigh.render(sceneHigh, camera);
+      composer.render();                                  // 全景（含辉光后处理）
+      rendererHigh.render(sceneHigh, camera);             // 详情高模（无后处理，保持清晰）
+      updateFPS(performance.now());
     });
     window.addEventListener('resize', () => {
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
       rendererLow.setSize(innerWidth, innerHeight);
       rendererHigh.setSize(innerWidth, innerHeight);
+      composer.setSize(innerWidth, innerHeight);
+      bloomPass.resolution.set(Math.floor(innerWidth / 2), Math.floor(innerHeight / 2));
     });
     window.addEventListener('keydown', e => {
       if (e.key === 'Escape' && state.mode === Mode.DETAIL) exitDetail();
@@ -890,8 +1026,10 @@
     const v0 = overviewView();
     camera.position.copy(v0.pos);
     controls.target.copy(v0.tgt);
-    controls.minDistance = 2;
-    controls.maxDistance = 40;
+    controls.minDistance = 4;
+    controls.maxDistance = 80;   // 展台半径 15，允许拉远俯瞰全景
+    controls.autoRotate = true;  // 自动旋转默认开启（gui 可关）
+    controls.autoRotateSpeed = 0.6;  // 慢速旋转（约 3.6°/秒），先看清前排再缓缓展示
     controls.update();
     init();
   </script>

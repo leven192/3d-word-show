@@ -47,6 +47,56 @@ $sources = @{
         'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js',
         'https://unpkg.com/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js'
     )
+    'postprocessing/EffectComposer.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/postprocessing/EffectComposer.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js'
+    )
+    'postprocessing/RenderPass.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/postprocessing/RenderPass.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/RenderPass.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/RenderPass.js'
+    )
+    'postprocessing/UnrealBloomPass.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/postprocessing/UnrealBloomPass.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js'
+    )
+    'postprocessing/Pass.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/postprocessing/Pass.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/Pass.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/Pass.js'
+    )
+    'postprocessing/MaskPass.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/postprocessing/MaskPass.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/MaskPass.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/MaskPass.js'
+    )
+    'postprocessing/ShaderPass.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/postprocessing/ShaderPass.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/postprocessing/ShaderPass.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/ShaderPass.js'
+    )
+    'shaders/CopyShader.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/shaders/CopyShader.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/shaders/CopyShader.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/shaders/CopyShader.js'
+    )
+    'shaders/LuminosityHighPassShader.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/shaders/LuminosityHighPassShader.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/shaders/LuminosityHighPassShader.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/shaders/LuminosityHighPassShader.js'
+    )
+    'objects/Reflector.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/objects/Reflector.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/objects/Reflector.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/objects/Reflector.js'
+    )
+    'environments/RoomEnvironment.js' = @(
+        'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/environments/RoomEnvironment.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/environments/RoomEnvironment.js',
+        'https://unpkg.com/three@0.160.0/examples/jsm/environments/RoomEnvironment.js'
+    )
     'lil-gui.esm.min.js' = @(
         'https://registry.npmmirror.com/lil-gui/0.20.0/files/dist/lil-gui.esm.min.js',
         'https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js',
@@ -115,6 +165,16 @@ if (Test-Path $bfu) {
         Write-Host "已修补 utils/BufferGeometryUtils.js ：'three' 导入改为相对路径" -ForegroundColor Green
     } elseif ($bc -match "from '../three.module.js';") {
         Write-Host "utils/BufferGeometryUtils.js 已是相对路径导入（无需修补）" -ForegroundColor DarkGray
+    }
+}
+# postprocessing/shaders/objects/environments 的 'three' 导入修正（相对 three 都是上一级）
+foreach ($sub in @('postprocessing', 'shaders', 'objects', 'environments')) {
+    Get-ChildItem (Join-Path $libDir $sub) -Filter '*.js' -ErrorAction SilentlyContinue | ForEach-Object {
+        $pc = [System.IO.File]::ReadAllText($_.FullName)
+        if ($pc -match "from 'three';") {
+            [System.IO.File]::WriteAllText($_.FullName, $pc -replace "from 'three';", "from '../three.module.js';", (New-Object System.Text.UTF8Encoding($false)))
+            Write-Host "已修补 $sub/$($_.Name) ：'three' 导入改为相对路径" -ForegroundColor Green
+        }
     }
 }
 

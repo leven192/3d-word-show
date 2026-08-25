@@ -45,6 +45,14 @@ if (Test-Path $libUtils) {
     Copy-Item $libUtils (Join-Path $libDir 'utils') -Recurse -Force
     Write-Host "已复制 lib\utils\"
 }
+# lib/postprocessing/ + lib/shaders/ + lib/objects/ + lib/environments/（后处理/反射依赖）
+foreach ($sub in @('postprocessing', 'shaders', 'objects', 'environments')) {
+    $subDir = Join-Path $root "lib\$sub"
+    if (Test-Path $subDir) {
+        Copy-Item $subDir (Join-Path $libDir $sub) -Recurse -Force
+        Write-Host "已复制 lib\$sub\"
+    }
+}
 
 # 3) 内嵌模型（从当前 model.glb 重新生成）
 $glb = Join-Path $root 'model.glb'
@@ -65,6 +73,14 @@ if (Test-Path $glb) {
 # 4) 页面与模型文件
 Copy-Item (Join-Path $root 'index.html') (Join-Path $dist 'index.html')
 if (Test-Path $glb) { Copy-Item $glb (Join-Path $dist 'model.glb') }
+# 品牌图标（favicon + 页面 Logo）
+foreach ($ic in @('favicon.png', 'apple-touch-icon.png', 'logo2.png')) {
+    $icSrc = Join-Path $root $ic
+    if (Test-Path $icSrc) {
+        Copy-Item $icSrc (Join-Path $dist $ic)
+        Write-Host "已复制 $ic"
+    }
+}
 
 # 5) 多设备配置与模型目录（models.json + models/ + thumbs/）
 $cfg = Join-Path $root 'models.json'
