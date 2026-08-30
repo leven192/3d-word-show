@@ -99,6 +99,19 @@
     #device-panel { transition: transform .45s cubic-bezier(.2,.8,.2,1); }
     body.in-detail #device-panel { transform: translateX(-100%); }
     body.in-detail #share-btn { opacity: 0; pointer-events: none; }
+
+    /* ========== 常驻「返回大厅」按钮（详情模式显示，不随面板折叠） ========== */
+    #lobby-btn {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-70px);
+      z-index: 20; padding: 9px 24px; border: 1px solid rgba(255,255,255,.22); border-radius: 22px;
+      background: rgba(20,26,40,.85); backdrop-filter: blur(8px);
+      color: #fff; font-size: 13.5px; font-weight: 600; letter-spacing: 3px; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,.4); transition: transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s, background .2s;
+      opacity: 0; pointer-events: none;
+    }
+    #lobby-btn:hover { background: rgba(46,91,255,.92); }
+    #lobby-btn:active { transform: translateX(-50%) translateY(0) scale(.96); }
+    body.in-detail #lobby-btn { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
     @media (max-width: 768px) {
       body.in-detail #device-panel { transform: translateY(100%); }
     }
@@ -203,6 +216,7 @@
     #loading-text { color: #e8eaf0; font-size: 14px; }
     .progress-wrap { width: 240px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
     #progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #4da3ff, #7c6bff); transition: width .2s; }
+    #progress-pct { color: #9fc6ff; font-size: 14px; font-weight: 700; letter-spacing: 1px; min-width: 52px; text-align: center; }
     #loading-overlay.error .spinner { border-top-color: #ff6b6b; }
     #loading-overlay.error #loading-text { color: #ff6b6b; }
 
@@ -289,10 +303,13 @@
     <div id="share-note"></div>
   </div>
 
+  <button id="lobby-btn" title="返回大厅">⌂ 返回大厅</button>
+
   <div id="loading-overlay">
     <div class="spinner"></div>
     <div id="loading-text">初始化中…</div>
     <div class="progress-wrap"><div id="progress-bar"></div></div>
+    <div id="progress-pct">0%</div>
   </div>
 
   <!-- 备用 CDN（本地 lib/ 不可用时自动切换） -->
@@ -329,6 +346,11 @@
     const overlay = document.getElementById('loading-overlay');
     const loadingText = document.getElementById('loading-text');
     const progressBar = document.getElementById('progress-bar');
+    const progressPct = document.getElementById('progress-pct');
+
+    // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
+    const ASSET_VER = 3;
+    const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
       overlay.classList.remove('hidden');
@@ -648,7 +670,7 @@
         const thumbUrl = d.model.startsWith('models/')
           ? d.model.replace('models/', 'models/thumb/')
           : d.model;
-        loader.load(thumbUrl, gltf => {
+        loader.load(ver(thumbUrl), gltf => {
           const obj = gltf.scene || gltf.scenes[0];
           const box = new THREE.Box3().setFromObject(obj);
           const size = box.getSize(new THREE.Vector3());
@@ -759,7 +781,9 @@
       if (show) {
         overlay.classList.remove('hidden', 'error');
         loadingText.textContent = text || '加载中…';
-        progressBar.style.width = (pct === undefined ? 0 : Math.round(pct * 100)) + '%';
+        const p = pct === undefined ? 0 : Math.round(pct * 100);
+        progressBar.style.width = p + '%';
+        progressPct.textContent = p + '%';
       } else {
         overlay.classList.add('hidden');
       }
@@ -873,7 +897,7 @@
         // 第二段：后台加载高模（LOD1），就绪后无缝替换缩略并释放缩略内存
         // 注意：完全后台化 —— 不显示全屏遮罩（避免挡住已显示的缩略模型），替换无感
         const loadHigh = () => {
-          loader.load(device.model, gltf => {
+          loader.load(ver(device.model), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
             if (state.mode !== Mode.DETAIL) {   // 已返回全景 → 丢弃，不残留内存
               const drop = gltf.scene || gltf.scenes[0];
@@ -906,7 +930,7 @@
 
         if (thumbUrl) {
           // 第一段：先加载缩略（秒显，LOD0）
-          loader.load(thumbUrl, gltf => {
+          loader.load(ver(thumbUrl), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
             const obj = gltf.scene || gltf.scenes[0];
             firstLoaded = obj;
@@ -1190,6 +1214,7 @@
       if (e.key === 'Escape' && state.mode === Mode.DETAIL) exitDetail();
     });
     document.getElementById('back-btn').addEventListener('click', exitDetail);
+    document.getElementById('lobby-btn').addEventListener('click', exitDetail);
 
     /* ================= 分享：公网链接 + 二维码（微信扫码打开） ================= */
     // 公网正式地址（CloudBase 静态托管，自动部署，微信/手机可打开）
