@@ -1,0 +1,134 @@
+{
+  "devices": [
+    {
+      "id": "d1",
+      "name": "设备 1",
+      "desc": "示例设备（使用根目录 model.glb）",
+      "thumbnail": "",
+      "model": "model.glb",
+      "params": [
+        { "k": "型号", "v": "NAIGU-K1" },
+        { "k": "尺寸", "v": "800 × 600 × 900 mm" },
+        { "k": "重量", "v": "12.5 kg" },
+        { "k": "额定功率", "v": "2.2 kW" }
+      ]
+    },
+    {
+      "id": "d2",
+      "name": "设备 2",
+      "desc": "请将模型放入 models/device-02.glb",
+      "thumbnail": "",
+      "model": "models/device-02.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    },
+    {
+      "id": "d3",
+      "name": "设备 3",
+      "desc": "请将模型放入 models/device-03.glb",
+      "thumbnail": "",
+      "model": "models/device-03.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    },
+    {
+      "id": "d4",
+      "name": "设备 4",
+      "desc": "请将模型放入 models/device-04.glb",
+      "thumbnail": "",
+      "model": "models/device-04.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    },
+    {
+      "id": "d5",
+      "name": "设备 5",
+      "desc": "请将模型放入 models/device-05.glb",
+      "thumbnail": "",
+      "model": "models/device-05.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    },
+    {
+      "id": "d6",
+      "name": "设备 6",
+      "desc": "请将模型放入 models/device-06.glb",
+      "thumbnail": "",
+      "model": "models/device-06.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    },
+    {
+      "id": "d7",
+      "name": "设备 7",
+      "desc": "请将模型放入 models/device-07.glb",
+      "thumbnail": "",
+      "model": "models/device-07.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    },
+    {
+      "id": "d8",
+      "name": "设备 8",
+      "desc": "请将模型放入 models/device-08.glb",
+      "thumbnail": "",
+      "model": "models/device-08.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    },
+    {
+      "id": "d9",
+      "name": "设备 9",
+      "desc": "请将模型放入 models/device-09.glb",
+      "thumbnail": "",
+      "model": "models/device-09.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    },
+    {
+      "id": "d10",
+      "name": "设备 10",
+      "desc": "请将模型放入 models/device-10.glb",
+      "thumbnail": "",
+      "model": "models/device-10.glb",
+      "params": [
+        { "k": "型号", "v": "待定" },
+        { "k": "尺寸", "v": "待定" },
+        { "k": "重量", "v": "待定" },
+        { "k": "额定功率", "v": "待定" }
+      ]
+    }
+  ]
+}
