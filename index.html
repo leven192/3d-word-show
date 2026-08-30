@@ -209,39 +209,46 @@
     .lg { z-index: 5 !important; }
   </style>
   <!-- 兼容性检测（所有浏览器都会执行，早于 module 脚本）：
-       老内核微信不支持 ES module/WebGL → 显示引导层，避免白屏困惑 -->
+       新版微信（Chromium 内核）支持 WebGL/ES module → 直接显示 3D；
+       仅当内核不支持（老微信/无 WebGL）时显示引导层 -->
   <script>
     (function () {
       try {
+        var isWeChat = /MicroMessenger/i.test(navigator.userAgent);
         var supportsModules = 'noModule' in document.createElement('script');
         var cv = document.createElement('canvas');
         var supportsWebGL = !!(window.WebGLRenderingContext && (cv.getContext('webgl') || cv.getContext('experimental-webgl')));
-        var isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+        function addLayer(innerHTML) {
+          var layer = document.createElement('div');
+          layer.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f5f7fa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:"Microsoft YaHei",sans-serif;text-align:center;padding:24px;';
+          layer.innerHTML = innerHTML;
+          var mount = function () { (document.body || document.documentElement).appendChild(layer); };
+          if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
+        }
         var issues = [];
         if (!supportsModules) issues.push('当前浏览器版本过旧（不支持 3D 页面加载）');
         if (!supportsWebGL) issues.push('WebGL 3D 渲染不可用');
         if (issues.length) {
-          var layer = document.createElement('div');
-          layer.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#f5f7fa;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:"Microsoft YaHei",sans-serif;text-align:center;padding:24px;';
-          layer.innerHTML =
+          // 内核不支持：引导用系统浏览器打开（微信内也适用）
+          addLayer(
             '<div style="font-size:18px;font-weight:600;color:#1f2937;">无法显示 3D 展厅</div>' +
             '<div style="font-size:14px;color:#6b7280;">' + issues.join('；') + '</div>' +
             '<div style="font-size:13px;color:#6b7280;line-height:1.9;">' +
             (isWeChat
               ? '请点击右上角「···」→ 选择「在浏览器中打开」<br>使用 Chrome / Safari 打开即可正常浏览'
               : '请使用最新版 Chrome / Safari / Edge 浏览器打开') +
-            '</div>';
-          document.body.appendChild(layer);
+            '</div>'
+          );
           return;
         }
         if (isWeChat) {
-          // 微信内但可用：顶部轻提示，引导去浏览器获得最佳体验（可关闭）
+          // 微信内且内核可用：直接显示 3D；顶部轻提示（可关闭）引导最佳体验
           var bar = document.createElement('div');
           bar.id = 'wx-tip';
           bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;background:rgba(46,91,255,.93);color:#fff;font:12px "Microsoft YaHei",sans-serif;padding:9px 34px 9px 12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.25);';
-          bar.innerHTML = '3D 展厅建议点右上角「···」→「在浏览器中打开」体验最佳 <span id="wx-tip-close" style="position:absolute;right:10px;top:6px;cursor:pointer;font-size:14px;">✕</span>';
-          document.body.appendChild(bar);
-          document.getElementById('wx-tip-close').addEventListener('click', function () { bar.remove(); });
+          bar.innerHTML = '如需更流畅体验，可点右上角「···」→「在浏览器中打开」 <span id="wx-tip-close" style="position:absolute;right:10px;top:6px;cursor:pointer;font-size:14px;">✕</span>';
+          var mountBar = function () { document.body.appendChild(bar); document.getElementById('wx-tip-close').addEventListener('click', function () { bar.remove(); }); };
+          if (document.body) mountBar(); else document.addEventListener('DOMContentLoaded', mountBar);
         }
       } catch (e) { /* 检测失败不阻塞页面 */ }
     })();
@@ -331,12 +338,17 @@
     }
 
     // ---------- 加载 three.js（本地优先，CDN 回退） ----------
-    let THREE, OrbitControls, GLTFLoader, GUI, EffectComposer, RenderPass, UnrealBloomPass;
+    let THREE, OrbitControls, GLTFLoader, GUI, EffectComposer, RenderPass, UnrealBloomPass, RGBELoader, RoomEnvironment, DRACOLoader, RectAreaLightUniformsLib;
     try {
       THREE = await import('./lib/three.module.js');
       OrbitControls = (await import('./lib/OrbitControls.js')).OrbitControls;
       GLTFLoader = (await import('./lib/GLTFLoader.js')).GLTFLoader;
       GUI = (await import('./lib/lil-gui.esm.min.js')).default;
+      RGBELoader = (await import('./lib/RGBELoader.js')).RGBELoader;
+      RoomEnvironment = (await import('./lib/environments/RoomEnvironment.js')).RoomEnvironment;
+      DRACOLoader = (await import('./lib/DRACOLoader.js')).DRACOLoader;
+      RectAreaLightUniformsLib = (await import('./lib/RectAreaLightUniformsLib.js')).RectAreaLightUniformsLib;
+      RectAreaLightUniformsLib.init();   // 柔光箱（RectAreaLight）着色器初始化
       // 后处理（辉光通道）：EffectComposer + RenderPass + UnrealBloomPass
       EffectComposer = (await import('./lib/postprocessing/EffectComposer.js')).EffectComposer;
       RenderPass = (await import('./lib/postprocessing/RenderPass.js')).RenderPass;
@@ -355,6 +367,11 @@
           EffectComposer = (await import('three/addons/postprocessing/EffectComposer.js')).EffectComposer;
           RenderPass = (await import('three/addons/postprocessing/RenderPass.js')).RenderPass;
           UnrealBloomPass = (await import('three/addons/postprocessing/UnrealBloomPass.js')).UnrealBloomPass;
+          RGBELoader = (await import('three/addons/loaders/RGBELoader.js')).RGBELoader;
+          RoomEnvironment = (await import('three/addons/environments/RoomEnvironment.js')).RoomEnvironment;
+          DRACOLoader = (await import('three/addons/loaders/DRACOLoader.js')).DRACOLoader;
+          RectAreaLightUniformsLib = (await import('three/addons/lights/RectAreaLightUniformsLib.js')).RectAreaLightUniformsLib;
+          RectAreaLightUniformsLib.init();
           console.log('[线上展厅] 使用 CDN:', cdn.name);
           ok = true;
           break;
@@ -388,7 +405,7 @@
       r.setSize(innerWidth, innerHeight);
       r.outputColorSpace = THREE.SRGBColorSpace;
       r.toneMapping = THREE.ACESFilmicToneMapping;   // 电影级色调映射
-      r.toneMappingExposure = 0.5;                   // 默认最小曝光（gui 可调 0.5~2.5）
+      r.toneMappingExposure = 1.0;                  // 曝光 1.15（实测校准：不过曝、细节清晰）
       r.shadowMap.enabled = true;                    // 阴影（主光源投射，体现体积感）
       r.shadowMap.type = THREE.PCFSoftShadowMap;
       r.domElement.id = id;
@@ -405,50 +422,71 @@
     const controls = new OrbitControls(camera, rendererHigh.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
+    controls.zoomToCursor = true;   // 滚轮以鼠标位置为定点放大（用户体验优化）
 
     /* ================= 全景场景（低模，常驻）—— 赛博朋克视觉 ================= */
 
     // ---------- ① 背景系统（纯色可调 + 雾色联动，默认淡蓝灰摄影棚） ----------
     function setupBackground(scene) {
-      scene.background = new THREE.Color(0xcbd5e1);   // 淡蓝灰背景墙纸（gui 可调）
+      scene.background = new THREE.Color(0xa8adb5);   // 淡蓝灰背景墙纸（gui 可调）
       scene.fog = new THREE.Fog(0xcbd5e1, 30, 120);    // 雾色与背景一致；默认雾化距离最大（远 120）
     }
 
-    // ---------- ② 灯光系统（一盏舞台聚光灯，替代环境灯） ----------
+    // ---------- ② 灯光系统（高端展厅：顶部条形灯 + 中心聚光 + 冷白高对比） ----------
     function setupLights(scene, renderer) {
-      // 聚光灯：从上前方 (2,20,10) 照向展台中心 (0,0,0)
-      // 参数：intensity 250（物理光照）/ distance 100 / angle 0.55rad(~31°) 锥角 / penumbra 0.4 柔和边缘 / decay 1.5
-      const spot = new THREE.SpotLight(0xffffff, 250, 100, 0.55, 0.4, 1.5);
-      spot.position.set(2, 20, 10);
+      const lights = [];
+      // 顶部条形灯（冷白 RectAreaLight 宽条形，明亮顶光）
+      const strip = new THREE.RectAreaLight(0xeaf2ff, 6, 16, 2.5);
+      strip.position.set(0, 13, 0);
+      strip.lookAt(0, 0, 0);
+      scene.add(strip);
+      lights.push(strip);
+      // 中心聚光灯（聚焦展台中心，冷白，高对比光影）
+      const spot = new THREE.SpotLight(0xf0f7ff, 300, 120, 0.5, 0.35, 1.5);
+      spot.position.set(0, 16, 4);
       spot.target.position.set(0, 0, 0);
       scene.add(spot, spot.target);
+      lights.push(spot);
       if (renderer) {
         spot.castShadow = true;
         spot.shadow.mapSize.set(1024, 1024);
+        spot.shadow.camera.fov = 60;
         spot.shadow.camera.near = 1;
-        spot.shadow.camera.far = 60;
-        spot.shadow.camera.fov = 65;    // 与锥角匹配，阴影覆盖全部设备
+        spot.shadow.camera.far = 80;
         spot.shadow.camera.updateProjectionMatrix();
         spot.shadow.bias = -0.0005;
       }
-      return { spot };
+      // 极弱环境光（暗场，保中心聚光的高对比）
+      scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+      return { lights };
     }
 
-    // ---------- ③ 地面系统（哑光大理石，轻微光泽不抢视觉） ----------
+    // ---------- ③ 地面系统（反光地板：微妙渐变 + 高反射，中性灰摄影棚地） ----------
     function setupGround(scene) {
-      // 大理石地面：巨大平面 200x200，MeshPhysicalMaterial
-      // roughness 0.5 半哑光 / clearcoat 0.4 轻微清漆（无环境贴图，无反射干扰）
-      // 不添加反射盘（无"两个模型"倒影）
+      // 反光地板渐变纹理：中心微亮 #eceff4 → 边缘中性灰 #c6cdd8（微妙渐变，无暗角）
+      const gcv = document.createElement('canvas');
+      gcv.width = 1024; gcv.height = 1024;
+      const gctx = gcv.getContext('2d');
+      const gg = gctx.createRadialGradient(512, 512, 150, 512, 512, 740);
+      gg.addColorStop(0, '#a5aab2');
+      gg.addColorStop(1, '#7c828c');
+      gctx.fillStyle = gg;
+      gctx.fillRect(0, 0, 1024, 1024);
+      const gtex = new THREE.CanvasTexture(gcv);
+      gtex.colorSpace = THREE.SRGBColorSpace;
+      // 大理石地面：巨大平面 200x200，清漆反光 + 渐变
+      // roughness 0.3 半光滑 / clearcoat 1.0 抛光 / envMapIntensity 1.5 强环境反射（微妙倒影感）
       const marble = new THREE.Mesh(
         new THREE.PlaneGeometry(200, 200),
         new THREE.MeshPhysicalMaterial({
-          color: 0xe0e0e0, roughness: 0.5, metalness: 0.1,
-          clearcoat: 0.4, clearcoatRoughness: 0.3
+          color: 0xffffff, map: gtex, roughness: 0.3, metalness: 0.05,
+          clearcoat: 1.0, clearcoatRoughness: 0.1,
+          envMapIntensity: 1.5
         })
       );
       marble.rotation.x = -Math.PI / 2;
       marble.position.y = 0;
-      marble.receiveShadow = true;   // 接触阴影：设备在光滑地面上的柔和落影
+      marble.receiveShadow = true;   // 接触阴影
       scene.add(marble);
       return { marble };
     }
@@ -527,13 +565,119 @@
 
     /* ================= 高模场景（详情，动态加载/卸载） ================= */
     const sceneHigh = new THREE.Scene();
-    // 详情照明：同样一盏聚光灯（object3D 同一时刻只能有一个 parent，故独立创建），指向模型中心
-    const hSpot = new THREE.SpotLight(0xffffff, 200, 60, 0.6, 0.3, 1.5);
-    hSpot.position.set(4, 12, 6);
-    hSpot.target.position.set(0, 0.3, 0);
-    sceneHigh.add(hSpot, hSpot.target);
+    // 详情照明：摄影棚柔光箱（前 + 顶棚格栅灯，强度经实测校准）+ 弱环境光
+    sceneHigh.add(new THREE.AmbientLight(0xffffff, 0.45));
+    const hFront = new THREE.RectAreaLight(0xffffff, 12, 8, 8);
+    hFront.position.set(0, 6, 10);
+    hFront.lookAt(0, 0.3, 0);
+    sceneHigh.add(hFront);
+    const hDir2 = new THREE.DirectionalLight(0xffffff, 2.5);   // 主光：照亮模型
+    hDir2.position.set(6, 12, 8);
+    sceneHigh.add(hDir2);
+    const hBack = new THREE.RectAreaLight(0xffffff, 6, 8, 8);
+    hBack.position.set(0, 5, -10);
+    hBack.lookAt(0, 0.3, 0);
+    sceneHigh.add(hBack);
+    const hTop = new THREE.RectAreaLight(0xffffff, 14, 10, 10);
+    hTop.position.set(0, 12, 0);
+    hTop.lookAt(0, 0, 0);
+    sceneHigh.add(hTop);
+
+    /* ================= HDRI 环境（金属反射，解决发黑；不影响背景色） ================= */
+    // 用 RGBELoader 加载工业风 HDRI → PMREM 环境贴图 → 全景/详情共享 scene.environment
+    // scene.background 保持淡蓝灰摄影棚（#cbd5e1），HDRI 只作环境反射来源
+    // 优先级：polyhaven → 本地 hdr/ → jsdelivr；全部失败则跳过（聚光灯仍可照明）
+    const HDR_SOURCES = [
+      'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/studio_small_09_2k.hdr',   // 摄影棚风格：无缝360°、中性灰、柔光箱、均匀照明
+      'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/industrial_sunset_puresky_1k.hdr',
+      './hdr/studio.hdr',
+      'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/equirectangular/royal_esplanade_1k.hdr'
+    ];
+    const rgbe = new RGBELoader();
+    const pmremEnv = new THREE.PMREMGenerator(rendererLow);
+    // ① 立即用 RoomEnvironment 设置环境（同步，纯金属模型瞬间有反射，不会黑）
+    // ② 异步加载 HDRI，成功后替换（更真实；失败则保持 RoomEnvironment）
+    const envFallback = pmremEnv.fromScene(new RoomEnvironment(), 0.04).texture;
+    sceneLow.environment = envFallback;
+    sceneHigh.environment = envFallback;
+    function loadEnv(index) {
+      if (index >= HDR_SOURCES.length) { console.warn('[线上展厅] HDRI 加载失败，保持 RoomEnvironment 环境'); return; }
+      rgbe.load(HDR_SOURCES[index], tex => {
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        window.__hdrBg = tex;   // 保留 equirect 纹理（HDRI 背景用）
+        const env = pmremEnv.fromEquirectangular(tex).texture;
+        sceneLow.environment = env;    // ← 关键：全景金属反射光
+        sceneHigh.environment = env;   // ← 关键：详情金属反射光
+        // 背景同步为 HDRI（受「HDRI 背景」开关控制，默认开；关闭回淡蓝灰）
+        if (params.hdrBackground !== false) sceneLow.background = tex;
+        tex.needsUpdate = true;
+        pmremEnv.dispose();
+        console.log('[线上展厅] HDRI 环境已应用:', HDR_SOURCES[index]);
+      }, null, () => loadEnv(index + 1));
+    }
+    loadEnv(0);
+    // 环境强度全局控制（HDR 调节）
+    // 大厅（sceneLow）跟随滑条（默认 0.1，光线柔和不刺眼）；
+    // 详情（sceneHigh）不低于 1.5（金属模型必须有足够反射，否则发黑）
+    function setEnvIntensity(k) {
+      const apply = (sc, v) => {
+        sc.traverse(o => {
+          if (o.isMesh && o.material) {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            mats.forEach(m => { if (m && 'envMapIntensity' in m) m.envMapIntensity = v; });
+          }
+        });
+      };
+      apply(sceneLow, k);                 // 大厅：默认 0.1
+      apply(sceneHigh, Math.max(k, 2.0)); // 详情：至少 2.0（明亮清晰）
+    }
 
     const loader = new GLTFLoader();
+    // Draco 解码（models/device-XX.glb 已用 gltf-transform Draco 压缩，体积缩小 6~14 倍）
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('./lib/draco/');
+    dracoLoader.setDecoderConfig({ type: 'js' });   // 强制 JS 解码器（wasm 在某些环境编译失败，JS 更兼容）
+    loader.setDRACOLoader(dracoLoader);
+
+    /* ================= 全景缩略模型（有模型→显示缩略，无模型→保留立方体） ================= */
+    const thumbObjects = [];   // 全景缩略模型（可点击）
+    function loadThumbs() {
+      if (!state.devices.length) return;
+      state.devices.forEach((d, i) => {
+        // 缩略路径：models/device-XX.glb → models/thumb/device-XX.glb；d1(model.glb) 直接用原模型
+        const thumbUrl = d.model.startsWith('models/')
+          ? d.model.replace('models/', 'models/thumb/')
+          : d.model;
+        loader.load(thumbUrl, gltf => {
+          const obj = gltf.scene || gltf.scenes[0];
+          const box = new THREE.Box3().setFromObject(obj);
+          const size = box.getSize(new THREE.Vector3());
+          if (size.x <= 0 || size.y <= 0 || size.z <= 0) return;
+          // 缩放到占位立方体尺寸（0.85），底部落地
+          const scale = 0.85 / Math.max(size.x, size.y, size.z);
+          obj.scale.setScalar(scale);
+          box.setFromObject(obj);
+          const c = box.getCenter(new THREE.Vector3());
+          const p = devicePositions[i];
+          obj.position.set(p.x - c.x, -c.y, p.z - c.z);
+          obj.userData.deviceId = i;
+          obj.traverse(o => { if (o.isMesh) o.userData.deviceId = i; });   // 子网格可点击命中
+          thumbObjects.push(obj);
+          sceneLow.add(obj);
+          setEnvIntensity(params.envIntensity);   // 大厅缩略模型也应用 0.1（不刺眼）
+          // 隐藏对应立方体实例（矩阵缩放为 0）
+          const hide = new THREE.Object3D();
+          hide.position.set(p.x, 0, p.z);
+          hide.scale.set(0.0001, 0.0001, 0.0001);
+          hide.updateMatrix();
+          bodyMesh.setMatrixAt(i, hide.matrix);
+          baseMesh.setMatrixAt(i, hide.matrix);
+          bodyMesh.instanceMatrix.needsUpdate = true;
+          baseMesh.instanceMatrix.needsUpdate = true;
+          console.log('[线上展厅] 全景缩略已加载:', d.name, '(' + thumbUrl + ')');
+        }, null, () => { /* 无缩略文件 → 保留立方体占位 */ });
+      });
+    }
 
     /* ================= 内存管理：递归释放模型资源 ================= */
     function disposeObject(obj) {
@@ -691,24 +835,96 @@
         }
       });
     }
+    // 金属材质可见性增强：metalness=1 + roughness=1 的"粗糙纯金属"在环境不足时呈黑剪影
+    // → 提高 envMapIntensity + 略降 metalness（保留金属感，但让漫反射参与，防全黑）
+    function ensureMetalVisible(obj) {
+      obj.traverse(o => {
+        if (o.isMesh && o.material) {
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach(m => {
+            if (!m || m.isMeshBasicMaterial || m.metalness === undefined) return;
+            m.envMapIntensity = Math.max(m.envMapIntensity || 1, 2.0);
+            if (m.metalness > 0.7) m.metalness = 0.75;
+            m.needsUpdate = true;
+          });
+        }
+      });
+    }
     function loadHighModel(device) {
       const token = ++state.loadToken;
       return new Promise(resolve => {
-        loader.load(device.model, gltf => {
-          if (token !== state.loadToken) { resolve(null); return; }   // 已被更新请求取代
-          const obj = gltf.scene || gltf.scenes[0];
-          boostTextures(obj);           // 贴图各向异性拉满（拉近清晰）
+        const thumbUrl = device.model.startsWith('models/')
+          ? device.model.replace('models/', 'models/thumb/')
+          : (device.model === 'model.glb' ? 'models/thumb/device-01.glb' : null);
+        const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+        let firstLoaded = null;   // 第一段显示的模型（缩略/LOD0）
+
+        // 模型就位（处理材质 + 入场景）；任何路径都必须 resolve，避免 Loading 卡死
+        const finish = (obj) => {
+          if (token !== state.loadToken) { sceneHigh.remove(obj); disposeObject(obj); resolve(null); return; }
+          boostTextures(obj);
+          ensureMetalVisible(obj);
+          setEnvIntensity(params.envIntensity);
           sceneHigh.add(obj);
           state.highModel = obj;
           resolve(obj);
-        }, e => {
-          if (e && e.total && token === state.loadToken) {
-            setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
-          }
-        }, () => {
-          // 失败：也返回 null（面板仍显示参数，状态栏提示缺失）
-          resolve(null);
-        });
+        };
+
+        // 第二段：后台加载高模（LOD1），就绪后无缝替换缩略并释放缩略内存
+        // 注意：完全后台化 —— 不显示全屏遮罩（避免挡住已显示的缩略模型），替换无感
+        const loadHigh = () => {
+          loader.load(device.model, gltf => {
+            if (token !== state.loadToken) { resolve(null); return; }
+            if (state.mode !== Mode.DETAIL) {   // 已返回全景 → 丢弃，不残留内存
+              const drop = gltf.scene || gltf.scenes[0];
+              sceneHigh.remove(drop); disposeObject(drop);
+              resolve(null);
+              return;
+            }
+            const obj = gltf.scene || gltf.scenes[0];
+            // 替换：卸载缩略 → 显示高模
+            if (firstLoaded) { sceneHigh.remove(firstLoaded); disposeObject(firstLoaded); firstLoaded = null; }
+            finish(obj);
+            setLoading(false);                          // 保险：确保遮罩关闭
+            setStatus('模型已加载（高清）', 'ok');       // 状态栏更新，不遮罩
+            console.log('[线上展厅] 已升级为高清模型 (LOD1):', device.model);
+          }, e => {
+            if (e && e.total) {
+              if (!firstLoaded) {
+                // 无缩略（如设备1）：直接加载高模，显示进度条
+                setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
+              } else {
+                console.log('[线上展厅] 高清模型加载中', (e.loaded / e.total * 100).toFixed(0) + '%');
+              }
+            }
+          }, () => {
+            console.warn('[线上展厅] 高清模型失败，保留缩略模型 (LOD0)');
+            setLoading(false);   // 保险：确保遮罩关闭
+            if (!firstLoaded) resolve(null);   // 无缩略可保留 → 结束加载（防 Loading 卡死）
+          });
+        };
+
+        if (thumbUrl) {
+          // 第一段：先加载缩略（秒显，LOD0）
+          loader.load(thumbUrl, gltf => {
+            if (token !== state.loadToken) { resolve(null); return; }
+            const obj = gltf.scene || gltf.scenes[0];
+            firstLoaded = obj;
+            finish(obj);
+            // 桌面端：后台升级高清模型（LOD1）；移动端保持缩略（性能）
+            if (!isMobile) loadHigh();
+          }, e => {
+            if (e && e.total && token === state.loadToken) {
+              setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
+            }
+          }, () => {
+            // 缩略失败 → 直接加载高模（高模成功/失败都会 resolve）
+            loadHigh();
+          });
+        } else {
+          // 无缩略文件（如 d1）→ 直接加载高模
+          loadHigh();
+        }
       });
     }
 
@@ -741,6 +957,7 @@
 
       // 背景虚化 + 高模特写取景（模型尺寸适配相机距离）
       app.classList.add('blur');
+      sceneHigh.background = new THREE.Color(0xb8bdc5);   // 详情亮灰背景（明亮清晰环境）
       if (model) {
         fitDetailView(model);
         setStatus('模型已加载', 'ok');
@@ -770,6 +987,7 @@
       clearHighlight();
       syncSidebar(-1);
       app.classList.remove('blur');
+      sceneHigh.background = null;   // 返回全景：清除详情背景（恢复透明叠加）
 
       const v = overviewView();
       await flyTo(v.pos, v.tgt, 900);
@@ -822,6 +1040,23 @@
     const pointer = new THREE.Vector2();
     let downPos = null;
     rendererHigh.domElement.addEventListener('pointerdown', e => { downPos = [e.clientX, e.clientY]; });
+    // 双击定点放大：命中模型处 → 目标点移到该处并拉近；双击空白 → 回到模型整体
+    rendererHigh.domElement.addEventListener('dblclick', e => {
+      if (state.mode !== Mode.DETAIL || !state.highModel) return;
+      pointer.x = (e.clientX / innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObject(state.highModel, true);
+      if (hits.length) {
+        controls.target.copy(hits[0].point);   // 定点：旋转/放大中心移到命中处
+        controls.dollyIn(1.35);                // 拉近一级
+      } else {
+        // 双击空白：回到模型整体视角（fitDetailView 重定位）
+        const box = new THREE.Box3().setFromObject(state.highModel);
+        const c = box.getCenter(new THREE.Vector3());
+        controls.target.set(c.x, c.y, c.z);
+      }
+    });
     rendererHigh.domElement.addEventListener('pointerup', e => {
       if (!downPos) return;
       const dx = e.clientX - downPos[0], dy = e.clientY - downPos[1];
@@ -831,7 +1066,7 @@
       pointer.x = (e.clientX / innerWidth) * 2 - 1;
       pointer.y = -(e.clientY / innerHeight) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects([bodyMesh, baseMesh, ...labels], false);
+      const hits = raycaster.intersectObjects([bodyMesh, baseMesh, ...labels, ...thumbObjects], false);
       if (!hits.length) return;
       const h = hits[0];
       const id = h.object.isInstancedMesh ? h.instanceId : h.object.userData.deviceId;
@@ -867,9 +1102,11 @@
         if (!state.devices.length) { showFatal('models.json 中没有设备'); return; }
         renderSidebar();
         state.devices.forEach((d, i) => makeLabel(d.name, i));
-        // 全景低模已就绪（不依赖任何 GLB），隐藏加载遮罩
+        // 全景就绪，隐藏加载遮罩
         setLoading(false);
-        console.log('[线上展厅] 全景就绪，共 ' + state.devices.length + ' 台设备');
+        // 缩略模型延迟后台加载（不阻塞首屏；无缩略则保留立方体）
+        setTimeout(() => loadThumbs(), 1500);
+        console.log('[线上展厅] 全景就绪，共 ' + state.devices.length + ' 台设备（缩略模型延迟加载）');
       } catch (e) {
         console.error(e);
         showFatal('models.json 加载失败：' + e.message);
@@ -879,8 +1116,8 @@
     /* ================= lil-gui 控制面板 ================= */
     const params = {
       autoRotate: true, autoRotateSpeed: 0.6,
-      bloom: true, fogFar: 120, showFPS: false,
-      exposure: 0.5,
+      bloom: false, bloomStrength: 0.1, fogFar: 120, showFPS: false,
+      exposure: 1.8, envIntensity: 0.7, hdrBackground: false,
       resetView: () => {
         if (state.mode === Mode.DETAIL && state.selectedIndex >= 0) {
           const v = detailView(state.selectedIndex);
@@ -892,30 +1129,23 @@
       }
     };
     const gui = new GUI({ title: '控制面板' });
+    gui.open();   // 控制面板默认展开（不收起）
     const vf = gui.addFolder('视图');
     vf.add(params, 'resetView').name('重置视角');
     vf.add(params, 'autoRotate').name('自动旋转').onChange(v => { controls.autoRotate = v; });
     vf.add(params, 'autoRotateSpeed', 0, 10, 0.1).name('旋转速度').onChange(v => { controls.autoRotateSpeed = v; });
     const rf = gui.addFolder('渲染');
-    rf.add(params, 'bloom', true).name('辉光 (UnrealBloom)').onChange(v => { bloomPass.enabled = v; });
-    rf.add(params, 'fogFar', 20, 120, 2).name('雾化距离(结束)').onChange(v => { sceneLow.fog.far = v; });
-    rf.add(params, 'showFPS', false).name('显示 FPS').onChange(v => {
-      if (!fpsEl) {
-        fpsEl = document.createElement('div');
-        fpsEl.style.cssText = 'position:fixed;top:10px;right:10px;z-index:50;color:#8fd0ff;font:12px monospace;background:rgba(0,0,0,.5);padding:3px 8px;border-radius:6px;pointer-events:none;';
-        document.body.appendChild(fpsEl);
-      }
-      fpsEl.style.display = v ? 'block' : 'none';
-    });
-    rf.add(params, 'exposure', 0.5, 2.5, 0.01).name('曝光').onChange(v => { rendererLow.toneMappingExposure = v; rendererHigh.toneMappingExposure = v; });
+    // 仅保留曝光（其余渲染参数用代码默认值，不暴露给用户）
+    rf.add(params, 'exposure', 0.5, 5, 0.05).name('曝光').onChange(v => { rendererLow.toneMappingExposure = 0.85; rendererHigh.toneMappingExposure = v; });
     vf.open(); rf.open();
 
     /* ================= 显式应用默认参数（防缓存/时序问题，打开即生效） ================= */
     // 默认最大雾化距离（far=120，滑条上限）+ 最小曝光（0.5，滑条下限）
     sceneLow.fog.near = 30;
     sceneLow.fog.far = params.fogFar;
-    rendererLow.toneMappingExposure = params.exposure;
-    rendererHigh.toneMappingExposure = params.exposure;
+    rendererLow.toneMappingExposure = 0.85;   // 展厅：明亮
+    rendererHigh.toneMappingExposure = params.exposure;   // 详情：保持现在设置
+    setEnvIntensity(params.envIntensity);   // 默认环境强度：大厅 0.1（柔和），详情 ≥1.5（防黑）
     console.log('[线上展厅] 默认参数已应用: 雾化距离=' + sceneLow.fog.far + ' 曝光=' + params.exposure + ' (NAIGU EXPO V1.5)');
 
     /* ================= 后处理：辉光通道（仅全景底层，极克制防过曝） ================= */
@@ -925,9 +1155,10 @@
     composer.addPass(new RenderPass(sceneLow, camera));
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(Math.floor(innerWidth / 2), Math.floor(innerHeight / 2)),
-      0.15, 0.4, 1.0
+      0.1, 0.4, 0.8   // 展厅辉光 0.1（克制，控制面板可调）
     );
     composer.addPass(bloomPass);
+    bloomPass.enabled = false;   // 取消辉光（gui 可手动开启）
 
     /* ================= FPS 统计（性能测试用） ================= */
     let fpsEl = null, fpsFrames = 0, fpsLast = performance.now();
