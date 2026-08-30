@@ -782,7 +782,8 @@
       if (show) {
         overlay.classList.remove('hidden', 'error');
         loadingText.textContent = text || '加载中…';
-        const p = pct === undefined ? 0 : Math.round(pct * 100);
+        const raw = pct === undefined ? 0 : Math.round(pct * 100);
+        const p = Math.max(0, Math.min(100, raw));   // 钳制 0-100%（进度事件误差不会超过 100%）
         progressBar.style.width = p + '%';
         progressPct.textContent = p + '%';
       } else {
