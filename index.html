@@ -666,10 +666,11 @@
     function loadThumbs() {
       if (!state.devices.length) return;
       state.devices.forEach((d, i) => {
-        // 缩略路径：models/device-XX.glb → models/thumb/device-XX.glb；d1(model.glb) 直接用原模型
+        // 缩略路径：models/device-XX.glb → models/thumb/device-XX.glb；
+        // d1(model.glb) → models/thumb/device-01.glb（全景用轻量缩略，避免加载 11MB 原模型）
         const thumbUrl = d.model.startsWith('models/')
           ? d.model.replace('models/', 'models/thumb/')
-          : d.model;
+          : 'models/thumb/device-01.glb';
         loader.load(ver(thumbUrl), gltf => {
           const obj = gltf.scene || gltf.scenes[0];
           const box = new THREE.Box3().setFromObject(obj);
@@ -876,10 +877,13 @@
     }
     function loadHighModel(device) {
       const token = ++state.loadToken;
+      const enterTokenAtCall = state.enterToken;   // 捕获进入令牌：返回/切换会递增它 → 高模就绪后丢弃
       return new Promise(resolve => {
+        // 缩略图（LOD0）：仅当缩略图明显小于高模时使用「先显缩略+后台升级」；
+        // d1(model.glb) 缩略与高模同源且不小 → 详情直接加载高模（进度条 0-100% 真实反馈，总下载更少）
         const thumbUrl = device.model.startsWith('models/')
           ? device.model.replace('models/', 'models/thumb/')
-          : (device.model === 'model.glb' ? 'models/thumb/device-01.glb' : null);
+          : null;
         const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
         let firstLoaded = null;   // 第一段显示的模型（缩略/LOD0）
 
@@ -896,10 +900,12 @@
 
         // 第二段：后台加载高模（LOD1），就绪后无缝替换缩略并释放缩略内存
         // 注意：完全后台化 —— 不显示全屏遮罩（避免挡住已显示的缩略模型），替换无感
+        // 用 enterToken 判断「是否已被返回/切换打断」：进入流程中 mode 是 TRANSITION，
+        // 不能拿 mode 判断（直接加载高模时 enterDetail 仍在 await，mode 尚未变为 DETAIL）
         const loadHigh = () => {
           loader.load(ver(device.model), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
-            if (state.mode !== Mode.DETAIL) {   // 已返回全景 → 丢弃，不残留内存
+            if (state.enterToken !== enterTokenAtCall) {   // 已返回全景或切换到其它设备 → 丢弃
               const drop = gltf.scene || gltf.scenes[0];
               sceneHigh.remove(drop); disposeObject(drop);
               resolve(null);
