@@ -349,7 +349,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 3;
+    const ASSET_VER = 4;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -676,13 +676,16 @@
           const box = new THREE.Box3().setFromObject(obj);
           const size = box.getSize(new THREE.Vector3());
           if (size.x <= 0 || size.y <= 0 || size.z <= 0) return;
-          // 缩放到占位立方体尺寸（0.85），底部落地
+          // 缩放到占位立方体尺寸（0.85），最长边为基准
           const scale = 0.85 / Math.max(size.x, size.y, size.z);
           obj.scale.setScalar(scale);
+          // 缩放后重算包围盒（world matrix 需更新才会反映 scale）
+          obj.updateMatrixWorld(true);
           box.setFromObject(obj);
           const c = box.getCenter(new THREE.Vector3());
           const p = devicePositions[i];
-          obj.position.set(p.x - c.x, -c.y, p.z - c.z);
+          // 底部对齐地面（y=0）：-box.min.y 使模型完整立于地面，不埋入/不悬空
+          obj.position.set(p.x - c.x, -box.min.y, p.z - c.z);
           obj.userData.deviceId = i;
           obj.traverse(o => { if (o.isMesh) o.userData.deviceId = i; });   // 子网格可点击命中
           thumbObjects.push(obj);
