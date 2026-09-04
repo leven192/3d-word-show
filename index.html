@@ -1366,13 +1366,13 @@
       sceneHigh.background = new THREE.Color(0xb8bdc5);   // 详情亮灰背景（明亮清晰环境）
       if (model) {
         fitDetailView(model);
-        setStatus('模型已加载', 'ok');
-        await waitProgDone();   // 等平滑进度走到 100% 再关遮罩（保证百分比完整显示）
+        // 立即关遮罩显示画面（低模/缩略已就绪即可交互）；高模由后台 loadHigh 就绪后无感替换
+        setStatus(PERF.upgradeHigh ? '加载中（高清细节后台升级）…' : '模型已加载', 'loading');
       } else {
         setStatus('模型加载失败（' + device.model + ' 不存在？）', 'err');
       }
       stopProgressAnim();
-      setLoading(false);
+      setLoading(false);   // 模型一就绪立即进入画面，不卡加载遮罩
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.DETAIL;
       document.body.classList.add('in-detail');   // 隐藏侧栏/分享，面板独占左下角
