@@ -358,7 +358,7 @@
 
     // 模型资源版本号：仅在模型/缩略图文件内容更新时递增！
     // 页面逻辑改动（UI/性能）不递增 → 已下载的 glb 命中浏览器缓存，避免每次改版都重下几十 MB
-    const MODEL_VER = 40;
+    const MODEL_VER = 41;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + MODEL_VER;
 
     function showFatal(msg) {
@@ -878,6 +878,28 @@
           if (onProgress) onProgress((i + 1 - fromIndex) / (total - fromIndex));
         }
         console.log('[线上展厅] 全部全景缩略加载完成');
+        // 后台静默预取各设备高模到 IndexedDB（点击进详情时直接命中缓存 → 高清秒开）
+        // 仅 PC 预取（移动端不加载高模）；逐个下载，避免并发带宽抢占
+        if (PERF.upgradeHigh && state.devices.length) {
+          setTimeout(() => {
+            (async () => {
+              for (let i = 0; i < state.devices.length; i++) {
+                const d = state.devices[i];
+                const url = ver(d.model);
+                if (await idbGet(url)) continue;   // 已缓存跳过
+                try {
+                  const r = await fetch(url);
+                  if (r.ok) {
+                    const ab = await r.arrayBuffer();
+                    await idbPut(url, ab);
+                    console.log('[线上展厅] 已预取高模缓存:', d.name);
+                  }
+                } catch (e) { /* 预取失败静默忽略 */ }
+              }
+              console.log('[线上展厅] 高模预取完成');
+            })();
+          }, 800);
+        }
       })();
     }
 
