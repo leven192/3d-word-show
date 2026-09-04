@@ -337,7 +337,7 @@
 
     // 模型资源版本号：仅在模型/缩略图文件内容更新时递增！
     // 页面逻辑改动（UI/性能）不递增 → 已下载的 glb 命中浏览器缓存，避免每次改版都重下几十 MB
-    const MODEL_VER = 32;
+    const MODEL_VER = 33;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + MODEL_VER;
 
     function showFatal(msg) {
@@ -429,6 +429,16 @@
     const rendererLow = makeRenderer(false, 'low-canvas');
     // 顶层：详情高精度模型（透明背景，叠加在底层上方）
     const rendererHigh = makeRenderer(true, 'high-canvas');
+    // WebGL 崩溃防护：context lost 时优雅降载（半分辨率+提示），避免直接崩溃重载
+    [rendererLow, rendererHigh].forEach(r => {
+      r.domElement.addEventListener('webglcontextlost', e => {
+        e.preventDefault();
+        console.warn('[线上展厅] WebGL context lost，降载恢复');
+        setTimeout(() => {
+          try { r.setPixelRatio(1); r.setSize(innerWidth, innerHeight); } catch (err) {}
+        }, 300);
+      });
+    });
 
     // 共享相机 + 控制器（交互绑定顶层画布）
     const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 2000);
@@ -712,15 +722,14 @@
         }, null, () => { resolve(); });   // 无缩略文件 → 保留立方体占位
       });
     }
-    // 渐进式加载全部缩略：一台台串行加载，逐台推进进度条（初始化遮罩内完成，
-    // 用户看到真实百分比推进，而非一直 0% 后突然进入）
-    function loadThumbs(onProgress) {
-      if (!state.devices.length) return Promise.resolve();
+    // 渐进式加载缩略：从 fromIndex 起串行加载（前几台由首屏先行加载）
+    function loadThumbsFrom(fromIndex, onProgress) {
+      const total = state.devices.length;
+      if (fromIndex >= total) return Promise.resolve();
       return (async () => {
-        const total = state.devices.length;
-        for (let i = 0; i < total; i++) {
+        for (let i = fromIndex; i < total; i++) {
           await loadOneThumb(state.devices[i], i);
-          if (onProgress) onProgress((i + 1) / total);
+          if (onProgress) onProgress((i + 1 - fromIndex) / (total - fromIndex));
         }
         console.log('[线上展厅] 全部全景缩略加载完成');
       })();
@@ -1008,18 +1017,18 @@
             const obj = gltf.scene || gltf.scenes[0];
             firstLoaded = obj;
             finish(obj);
-            // 后台升级高清模型（LOD1）：缩略秒显后无感替换，手机/桌面均升级（模型已压缩至 11MB，可接受）
-            loadHigh();
+            // 桌面端后台升级高清模型（LOD1）；手机端保持缩略（最稳：单份低模，杜绝详情崩溃）
+            if (!isMobile) loadHigh();
           }, e => {
             if (e && e.total && token === state.loadToken) {
               setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
             }
           }, () => {
-            // 缩略失败 → 直接加载高模（高模成功/失败都会 resolve）
-            loadHigh();
+            // 缩略失败 → 直接加载高模（高模成功/失败都会 resolve）；手机端也无高模可加载时由 finish 兜底
+            if (!isMobile) loadHigh(); else resolve(null);
           });
         } else {
-          // 无缩略文件（如 d1）→ 直接加载高模
+          // 无缩略文件 → 直接加载高模
           loadHigh();
         }
       });
@@ -1066,6 +1075,8 @@
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.DETAIL;
       document.body.classList.add('in-detail');   // 隐藏侧栏/分享，面板独占左下角
+      // 详情模式：隐藏全景缩略模型（背景已虚化，无需渲染）→ 大幅降低 GPU/内存峰值防崩溃
+      thumbObjects.forEach(o => { o.visible = false; });
       console.log('[线上展厅] 进入详情模式:', device.name);
     }
 
@@ -1098,6 +1109,8 @@
       controls.minDistance = 4;   // 返回全景：恢复全景缩放范围（详情模式由 fitDetailView 设置）
       controls.maxDistance = 80;
       document.body.classList.remove('in-detail');  // 恢复侧栏与分享按钮
+      // 返回全景：恢复显示缩略模型
+      thumbObjects.forEach(o => { o.visible = true; });
       console.log('[线上展厅] 返回全景模式');
     }
 
@@ -1200,13 +1213,17 @@
         setLoading(true, '构建展厅…', 0.18);
         renderSidebar();
         state.devices.forEach((d, i) => makeLabel(d.name, i));
-        // 进度：引擎+数据已就绪 → 25%，剩余 75% 随缩略模型加载真实推进
-        setLoading(true, '加载展厅模型…', 0.25);
-        // 缩略模型在初始化遮罩内加载：逐台推进百分比，全部完成才进入展厅
-        // （8 台缩略共约 24MB，进度条 25%→100% 清晰反馈，避免"0% 卡住"假象）
-        await loadThumbs(p => setLoading(true, '加载展厅模型…', 0.25 + p * 0.75));
+        // 首屏：先加载前 2 台轻量缩略（快速出画面），遮罩显示真实进度
+        setLoading(true, '加载展厅模型…', 0.2);
+        await loadOneThumb(state.devices[0], 0);
+        setLoading(true, '加载展厅模型…', 0.55);
+        if (state.devices[1]) await loadOneThumb(state.devices[1], 1);
         setLoading(false);
-        console.log('[线上展厅] 全景就绪，共 ' + state.devices.length + ' 台设备（缩略模型加载完成）');
+        // 其余 6 台缩略后台逐台渐进加载（不阻塞进入，降低首屏内存峰值防崩溃）
+        setTimeout(() => {
+          loadThumbsFrom(2, p => console.log('[线上展厅] 缩略加载', Math.round(p * 100) + '%'));
+        }, 300);
+        console.log('[线上展厅] 全景就绪，剩余缩略后台加载');
       } catch (e) {
         console.error(e);
         showFatal('models.json 加载失败：' + e.message);
