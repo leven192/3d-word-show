@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <!-- NAIGU EXPO V1.5: fogFar=120 exposure=0.5 no-wireframe -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>耐锢科技线上展厅</title>
-  <!-- 正式 Logo favicon（logo2.png 生成，版本号强制刷新缓存） -->
+  <title>鑰愰敘绉戞妧绾夸笂灞曞巺</title>
+  <!-- 姝ｅ紡 Logo favicon锛坙ogo2.png 鐢熸垚锛岀増鏈彿寮哄埗鍒锋柊缂撳瓨锛?-->
   <link rel="icon" type="image/png" href="favicon.png?v=20260823" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20260823" />
   <style>
@@ -20,17 +20,17 @@
     }
     #app { position: fixed; inset: 0; }
 
-    /* 双层画布：底层=全景低模场景，顶层=详情高精度模型（透明） */
+    /* 鍙屽眰鐢诲竷锛氬簳灞?鍏ㄦ櫙浣庢ā鍦烘櫙锛岄《灞?璇︽儏楂樼簿搴︽ā鍨嬶紙閫忔槑锛?*/
     #app canvas { position: absolute; inset: 0; display: block; }
     #low-canvas  { z-index: 1; pointer-events: none; transition: filter .7s ease, transform .7s ease; }
     #high-canvas { z-index: 2; pointer-events: auto; }
-    /* 背景虚化：详情模式下底层全景变模糊，聚焦特写模型（深蓝灰背景保持原亮度） */
+    /* 鑳屾櫙铏氬寲锛氳鎯呮ā寮忎笅搴曞眰鍏ㄦ櫙鍙樻ā绯婏紝鑱氱劍鐗瑰啓妯″瀷锛堟繁钃濈伆鑳屾櫙淇濇寔鍘熶寒搴︼級 */
     #app.blur #low-canvas {
       filter: blur(12px) brightness(.9);
       transform: scale(1.06);
     }
 
-    /* ========== 详情参数面板（左下角，避开右上角 lil-gui 控制面板） ========== */
+    /* ========== 璇︽儏鍙傛暟闈㈡澘锛堝乏涓嬭锛岄伩寮€鍙充笂瑙?lil-gui 鎺у埗闈㈡澘锛?========== */
     #detail-panel {
       position: fixed; z-index: 12;
       left: 16px; bottom: 16px; width: 300px;
@@ -42,7 +42,7 @@
       transition: transform .45s cubic-bezier(.2,.8,.2,1), opacity .45s;
     }
     #detail-panel.show { transform: translateX(0); opacity: 1; pointer-events: auto; }
-    /* 收起状态：面板滑出屏幕（模型不被遮挡） */
+    /* 鏀惰捣鐘舵€侊細闈㈡澘婊戝嚭灞忓箷锛堟ā鍨嬩笉琚伄鎸★級 */
     #detail-panel.collapsed { transform: translateX(-130%); opacity: 0; pointer-events: none; }
     #detail-panel .dp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     #detail-panel .dp-name { font-size: 19px; font-weight: 700; flex: 1; min-width: 0; line-height: 1.35; word-break: break-all; }
@@ -61,7 +61,7 @@
     #detail-panel .dp-status.ok  { color: #5fd08a; }
     #detail-panel .dp-status.err { color: #ff7a7a; }
     #detail-panel .dp-status.loading { color: #ffc46b; }
-    /* 收起后的迷你标签条（点击展开，位于左下角与面板同位置） */
+    /* 鏀惰捣鍚庣殑杩蜂綘鏍囩鏉★紙鐐瑰嚮灞曞紑锛屼綅浜庡乏涓嬭涓庨潰鏉垮悓浣嶇疆锛?*/
     #dp-mini {
       position: fixed; left: 16px; bottom: 16px; z-index: 12;
       background: rgba(61,108,255,.9); color: #fff;
@@ -85,12 +85,12 @@
       #detail-panel.collapsed { transform: translateY(130%); }
       #dp-mini { top: auto; left: 50%; bottom: 12px; transform: translateX(-50%); }
     }
-    /* 详情模式：侧栏滑出隐藏（面板放左下角不被遮挡），分享按钮隐藏 */
+    /* 璇︽儏妯″紡锛氫晶鏍忔粦鍑洪殣钘忥紙闈㈡澘鏀惧乏涓嬭涓嶈閬尅锛夛紝鍒嗕韩鎸夐挳闅愯棌 */
     #device-panel { transition: transform .45s cubic-bezier(.2,.8,.2,1); }
     body.in-detail #device-panel { transform: translateX(-100%); }
     body.in-detail #share-btn { opacity: 0; pointer-events: none; }
 
-    /* ========== 常驻「返回大厅」按钮（详情模式显示，不随面板折叠） ========== */
+    /* ========== 甯搁┗銆岃繑鍥炲ぇ鍘呫€嶆寜閽紙璇︽儏妯″紡鏄剧ず锛屼笉闅忛潰鏉挎姌鍙狅級 ========== */
     #lobby-btn {
       position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-70px);
       z-index: 20; padding: 9px 24px; border: 1px solid rgba(255,255,255,.22); border-radius: 22px;
@@ -104,15 +104,15 @@
     body.in-detail #lobby-btn { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
     @media (max-width: 768px) {
       body.in-detail #device-panel { transform: translateY(100%); }
-      /* 手机端：返回大厅固定在左上角（右上角为控制面板，两区互不重叠） */
+      /* 鎵嬫満绔細杩斿洖澶у巺鍥哄畾鍦ㄥ乏涓婅锛堝彸涓婅涓烘帶鍒堕潰鏉匡紝涓ゅ尯浜掍笉閲嶅彔锛?*/
       #lobby-btn { left: 12px; transform: translateX(-12px) translateY(-70px); }
       #lobby-btn:hover { background: rgba(46,91,255,.92); }
       #lobby-btn:active { transform: translateX(-12px) translateY(0) scale(.96); }
       body.in-detail #lobby-btn { transform: translateX(0) translateY(0); }
-      /* 控制面板保持 lil-gui 默认右上角位置，不做竖放/收起覆盖（避免内容异常） */
+      /* 鎺у埗闈㈡澘淇濇寔 lil-gui 榛樿鍙充笂瑙掍綅缃紝涓嶅仛绔栨斁/鏀惰捣瑕嗙洊锛堥伩鍏嶅唴瀹瑰紓甯革級 */
     }
 
-    /* ========== 设备列表（桌面左侧栏 / 手机底部横条） ========== */
+    /* ========== 璁惧鍒楄〃锛堟闈㈠乏渚ф爮 / 鎵嬫満搴曢儴妯潯锛?========== */
     #device-panel {
       position: fixed; top: 0; left: 0; bottom: 0; z-index: 10;
       width: 210px;
@@ -121,16 +121,16 @@
       display: flex; flex-direction: column;
     }
     #device-panel h3 { color: #c9d2e0; font-size: 14px; font-weight: 600; padding: 14px 14px 10px; }
-    /* 品牌（左上角：正式 Logo 图片 + 公司名） */
+    /* 鍝佺墝锛堝乏涓婅锛氭寮?Logo 鍥剧墖 + 鍏徃鍚嶏級 */
     #brand {
       display: flex; align-items: center; gap: 8px;
       padding: 14px 14px 4px;
-      height: 44px;                      /* 与侧栏标题行高一致，垂直居中 */
+      height: 44px;                      /* 涓庝晶鏍忔爣棰樿楂樹竴鑷达紝鍨傜洿灞呬腑 */
       box-sizing: content-box;
     }
-    .logo-img { height: 26px; width: auto; flex: none; }   /* 正式 Logo 图片 */
+    .logo-img { height: 26px; width: auto; flex: none; }   /* 姝ｅ紡 Logo 鍥剧墖 */
     .logo-text {
-      color: #2b2b2b; font-size: 15px; font-weight: 700;        /* 深灰黑粗体 */
+      color: #2b2b2b; font-size: 15px; font-weight: 700;        /* 娣辩伆榛戠矖浣?*/
       font-family: "Microsoft YaHei", "PingFang SC", "Heiti SC", sans-serif;
       letter-spacing: 1px; white-space: nowrap;
     }
@@ -164,7 +164,7 @@
     #share-btn:hover { background: #3a4150; }
     @media (max-width: 768px) { #share-btn { bottom: 96px; } }
 
-    /* 分享面板（链接 + 二维码，微信扫码打开） */
+    /* 鍒嗕韩闈㈡澘锛堥摼鎺?+ 浜岀淮鐮侊紝寰俊鎵爜鎵撳紑锛?*/
     #share-panel {
       position: fixed; right: 14px; bottom: 52px; z-index: 16;
       width: 240px;
@@ -195,7 +195,7 @@
     }
     @media (max-width: 768px) { #share-panel { bottom: 132px; right: 10px; } }
 
-    /* ========== 加载遮罩（进度条；不透明，切换时避免闪烁） ========== */
+    /* ========== 鍔犺浇閬僵锛堣繘搴︽潯锛涗笉閫忔槑锛屽垏鎹㈡椂閬垮厤闂儊锛?========== */
     #loading-overlay {
       position: fixed; inset: 0; z-index: 30;
       background: #10131a;
@@ -219,9 +219,9 @@
 
     .lg { z-index: 5 !important; }
   </style>
-  <!-- 兼容性检测（所有浏览器都会执行，早于 module 脚本）：
-       新版微信（Chromium 内核）支持 WebGL/ES module → 直接显示 3D；
-       仅当内核不支持（老微信/无 WebGL）时显示引导层 -->
+  <!-- 鍏煎鎬ф娴嬶紙鎵€鏈夋祻瑙堝櫒閮戒細鎵ц锛屾棭浜?module 鑴氭湰锛夛細
+       鏂扮増寰俊锛圕hromium 鍐呮牳锛夋敮鎸?WebGL/ES module 鈫?鐩存帴鏄剧ず 3D锛?
+       浠呭綋鍐呮牳涓嶆敮鎸侊紙鑰佸井淇?鏃?WebGL锛夋椂鏄剧ず寮曞灞?-->
   <script>
     (function () {
       try {
@@ -237,23 +237,23 @@
           if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
         }
         var issues = [];
-        if (!supportsModules) issues.push('当前浏览器版本过旧（不支持 3D 页面加载）');
-        if (!supportsWebGL) issues.push('WebGL 3D 渲染不可用');
+        if (!supportsModules) issues.push('褰撳墠娴忚鍣ㄧ増鏈繃鏃э紙涓嶆敮鎸?3D 椤甸潰鍔犺浇锛?);
+        if (!supportsWebGL) issues.push('WebGL 3D 娓叉煋涓嶅彲鐢?);
         if (issues.length) {
-          // 内核不支持：引导用系统浏览器打开（微信内也适用）
+          // 鍐呮牳涓嶆敮鎸侊細寮曞鐢ㄧ郴缁熸祻瑙堝櫒鎵撳紑锛堝井淇″唴涔熼€傜敤锛?
           addLayer(
-            '<div style="font-size:18px;font-weight:600;color:#1f2937;">无法显示 3D 展厅</div>' +
-            '<div style="font-size:14px;color:#6b7280;">' + issues.join('；') + '</div>' +
+            '<div style="font-size:18px;font-weight:600;color:#1f2937;">鏃犳硶鏄剧ず 3D 灞曞巺</div>' +
+            '<div style="font-size:14px;color:#6b7280;">' + issues.join('锛?) + '</div>' +
             '<div style="font-size:13px;color:#6b7280;line-height:1.9;">' +
             (isWeChat
-              ? '请点击右上角「···」→ 选择「在浏览器中打开」<br>使用 Chrome / Safari 打开即可正常浏览'
-              : '请使用最新版 Chrome / Safari / Edge 浏览器打开') +
+              ? '璇风偣鍑诲彸涓婅銆屄仿仿枫€嶁啋 閫夋嫨銆屽湪娴忚鍣ㄤ腑鎵撳紑銆?br>浣跨敤 Chrome / Safari 鎵撳紑鍗冲彲姝ｅ父娴忚'
+              : '璇蜂娇鐢ㄦ渶鏂扮増 Chrome / Safari / Edge 娴忚鍣ㄦ墦寮€') +
             '</div>'
           );
           return;
         }
-        // 微信内且内核可用：直接显示 3D（无顶部提示条，保持画面干净）
-      } catch (e) { /* 检测失败不阻塞页面 */ }
+        // 寰俊鍐呬笖鍐呮牳鍙敤锛氱洿鎺ユ樉绀?3D锛堟棤椤堕儴鎻愮ず鏉★紝淇濇寔鐢婚潰骞插噣锛?
+      } catch (e) { /* 妫€娴嬪け璐ヤ笉闃诲椤甸潰 */ }
     })();
   </script>
 </head>
@@ -261,45 +261,45 @@
   <div id="app"></div>
 
   <div id="device-panel">
-    <div id="brand"><img class="logo-img" src="logo2.png" alt="耐锢科技" /><span class="logo-text">耐锢科技</span></div>
-    <h3>设备列表</h3>
+    <div id="brand"><img class="logo-img" src="logo2.png" alt="鑰愰敘绉戞妧" /><span class="logo-text">鑰愰敘绉戞妧</span></div>
+    <h3>璁惧鍒楄〃</h3>
     <div id="device-list"></div>
   </div>
 
   <div id="detail-panel">
     <div class="dp-head">
       <div class="dp-name"></div>
-      <button id="dp-collapse" title="收起面板（看模型）">—</button>
+      <button id="dp-collapse" title="鏀惰捣闈㈡澘锛堢湅妯″瀷锛?>鈥?/button>
     </div>
     <div class="dp-desc"></div>
     <table class="dp-params"></table>
     <div class="dp-status"></div>
-    <button id="back-btn">← 返回全景</button>
+    <button id="back-btn">鈫?杩斿洖鍏ㄦ櫙</button>
   </div>
-  <div id="dp-mini" class="hidden">📋 设备参数</div>
+  <div id="dp-mini" class="hidden">馃搵 璁惧鍙傛暟</div>
 
-  <button id="share-btn">分享 / 二维码</button>
+  <button id="share-btn">鍒嗕韩 / 浜岀淮鐮?/button>
 
   <div id="share-panel">
-    <div class="sp-head">分享给微信 / 手机</div>
+    <div class="sp-head">鍒嗕韩缁欏井淇?/ 鎵嬫満</div>
     <div class="sp-url-row">
       <input id="share-url" readonly />
-      <button id="share-copy">复制</button>
+      <button id="share-copy">澶嶅埗</button>
     </div>
     <div class="sp-qr-wrap"><canvas id="share-qr" width="180" height="180"></canvas></div>
     <div id="share-note"></div>
   </div>
 
-  <button id="lobby-btn" title="返回大厅">⌂ 返回大厅</button>
+  <button id="lobby-btn" title="杩斿洖澶у巺">鈱?杩斿洖澶у巺</button>
 
   <div id="loading-overlay">
     <div class="spinner"></div>
-    <div id="loading-text">初始化中…</div>
+    <div id="loading-text">鍒濆鍖栦腑鈥?/div>
     <div class="progress-wrap"><div id="progress-bar"></div></div>
     <div id="progress-pct">0%</div>
   </div>
 
-  <!-- 备用 CDN（本地 lib/ 不可用时自动切换） -->
+  <!-- 澶囩敤 CDN锛堟湰鍦?lib/ 涓嶅彲鐢ㄦ椂鑷姩鍒囨崲锛?-->
   <script type="importmap">
     {
       "imports": {
@@ -324,51 +324,51 @@
 
   <script type="module">
     /* ============================================================
-     *  耐锢科技线上展厅（3D 设备层级下钻展示）
-     *  状态机：OVERVIEW(全景) -> TRANSITION(飞行/加载) -> DETAIL(详情)
-     *          DETAIL -> TRANSITION -> OVERVIEW（返回）
-     *  内存管理：全景低模 = 常驻 InstancedMesh（共享几何体/材质，永不重建）
-     *            详情高模 = 按需加载，返回时递归释放 geometry/material/texture
+     *  鑰愰敘绉戞妧绾夸笂灞曞巺锛?D 璁惧灞傜骇涓嬮捇灞曠ず锛?
+     *  鐘舵€佹満锛歄VERVIEW(鍏ㄦ櫙) -> TRANSITION(椋炶/鍔犺浇) -> DETAIL(璇︽儏)
+     *          DETAIL -> TRANSITION -> OVERVIEW锛堣繑鍥烇級
+     *  鍐呭瓨绠＄悊锛氬叏鏅綆妯?= 甯搁┗ InstancedMesh锛堝叡浜嚑浣曚綋/鏉愯川锛屾案涓嶉噸寤猴級
+     *            璇︽儏楂樻ā = 鎸夐渶鍔犺浇锛岃繑鍥炴椂閫掑綊閲婃斁 geometry/material/texture
      * ============================================================ */
     const overlay = document.getElementById('loading-overlay');
     const loadingText = document.getElementById('loading-text');
     const progressBar = document.getElementById('progress-bar');
     const progressPct = document.getElementById('progress-pct');
 
-    /* ============ PC / 移动端性能分级（全局） ============
-     * isMobile：UA 或屏幕宽度 <768px 判定
-     * PERF 分级参数：像素比 / 抗锯齿 / 阴影 / 详情是否升级高模 / 材质降级
+    /* ============ PC / 绉诲姩绔€ц兘鍒嗙骇锛堝叏灞€锛?============
+     * isMobile锛歎A 鎴栧睆骞曞搴?<768px 鍒ゅ畾
+     * PERF 鍒嗙骇鍙傛暟锛氬儚绱犳瘮 / 鎶楅敮榻?/ 闃村奖 / 璇︽儏鏄惁鍗囩骇楂樻ā / 鏉愯川闄嶇骇
      */
     const isMobile = /Android|iPhone|iPad|iPod|Mobile|MicroMessenger/i.test(navigator.userAgent)
       || innerWidth < 768;
     const PERF = isMobile ? {
-      pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),  // 移动端 ≤1.5
-      antialias: false,                                         // 移动端关抗锯齿
-      shadows: false,                                           // 移动端关阴影
-      upgradeHigh: false,                                       // 移动端详情只用低模(缩略)
-      downgradeMaterial: true                                   // 移动端 PBR→Phong
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),  // 绉诲姩绔?鈮?.5
+      antialias: false,                                         // 绉诲姩绔叧鎶楅敮榻?
+      shadows: false,                                           // 绉诲姩绔叧闃村奖
+      upgradeHigh: false,                                       // 绉诲姩绔鎯呭彧鐢ㄤ綆妯?缂╃暐)
+      downgradeMaterial: true                                   // 绉诲姩绔?PBR鈫扨hong
     } : {
-      pixelRatio: window.devicePixelRatio || 1.5,               // PC：完全使用设备像素比（通常1.5~2.0），绝不限为1
-      antialias: true,                                          // PC 开抗锯齿
-      shadows: true,                                            // PC 开阴影
-      upgradeHigh: true,                                        // PC 升级高清（细节全保留）
+      pixelRatio: window.devicePixelRatio || 1.5,               // PC锛氬畬鍏ㄤ娇鐢ㄨ澶囧儚绱犳瘮锛堥€氬父1.5~2.0锛夛紝缁濅笉闄愪负1
+      antialias: true,                                          // PC 寮€鎶楅敮榻?
+      shadows: true,                                            // PC 寮€闃村奖
+      upgradeHigh: true,                                        // PC 鍗囩骇楂樻竻锛堢粏鑺傚叏淇濈暀锛?
       downgradeMaterial: false
     };
-    // 兼容旧引用：isMobile 已全局化（下方各函数直接用）
+    // 鍏煎鏃у紩鐢細isMobile 宸插叏灞€鍖栵紙涓嬫柟鍚勫嚱鏁扮洿鎺ョ敤锛?
 
-    // 模型资源版本号：仅在模型/缩略图文件内容更新时递增！
-    // 页面逻辑改动（UI/性能）不递增 → 已下载的 glb 命中浏览器缓存，避免每次改版都重下几十 MB
+    // 妯″瀷璧勬簮鐗堟湰鍙凤細浠呭湪妯″瀷/缂╃暐鍥炬枃浠跺唴瀹规洿鏂版椂閫掑锛?
+    // 椤甸潰閫昏緫鏀瑰姩锛圲I/鎬ц兘锛変笉閫掑 鈫?宸蹭笅杞界殑 glb 鍛戒腑娴忚鍣ㄧ紦瀛橈紝閬垮厤姣忔鏀圭増閮介噸涓嬪嚑鍗?MB
     const MODEL_VER = 34;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + MODEL_VER;
 
     function showFatal(msg) {
       overlay.classList.remove('hidden');
       overlay.classList.add('error');
-      loadingText.textContent = '加载失败：' + msg;
+      loadingText.textContent = '鍔犺浇澶辫触锛? + msg;
       progressBar.style.width = '100%';
     }
 
-    // ---------- 加载 three.js（本地优先，CDN 回退） ----------
+    // ---------- 鍔犺浇 three.js锛堟湰鍦颁紭鍏堬紝CDN 鍥為€€锛?----------
     let THREE, OrbitControls, GLTFLoader, GUI, EffectComposer, RenderPass, UnrealBloomPass, RGBELoader, RoomEnvironment, DRACOLoader, RectAreaLightUniformsLib;
     try {
       THREE = await import('./lib/three.module.js');
@@ -379,14 +379,14 @@
       RoomEnvironment = (await import('./lib/environments/RoomEnvironment.js')).RoomEnvironment;
       DRACOLoader = (await import('./lib/DRACOLoader.js')).DRACOLoader;
       RectAreaLightUniformsLib = (await import('./lib/RectAreaLightUniformsLib.js')).RectAreaLightUniformsLib;
-      RectAreaLightUniformsLib.init();   // 柔光箱（RectAreaLight）着色器初始化
-      // 后处理（辉光通道）：EffectComposer + RenderPass + UnrealBloomPass
+      RectAreaLightUniformsLib.init();   // 鏌斿厜绠憋紙RectAreaLight锛夌潃鑹插櫒鍒濆鍖?
+      // 鍚庡鐞嗭紙杈夊厜閫氶亾锛夛細EffectComposer + RenderPass + UnrealBloomPass
       EffectComposer = (await import('./lib/postprocessing/EffectComposer.js')).EffectComposer;
       RenderPass = (await import('./lib/postprocessing/RenderPass.js')).RenderPass;
       UnrealBloomPass = (await import('./lib/postprocessing/UnrealBloomPass.js')).UnrealBloomPass;
-      console.log('[线上展厅] 使用本地依赖');
+      console.log('[绾夸笂灞曞巺] 浣跨敤鏈湴渚濊禆');
     } catch (e) {
-      console.warn('[线上展厅] 本地依赖不可用，尝试 CDN', e);
+      console.warn('[绾夸笂灞曞巺] 鏈湴渚濊禆涓嶅彲鐢紝灏濊瘯 CDN', e);
       let ok = false;
       for (const cdn of window.__CDNS) {
         try {
@@ -403,90 +403,90 @@
           DRACOLoader = (await import('three/addons/loaders/DRACOLoader.js')).DRACOLoader;
           RectAreaLightUniformsLib = (await import('three/addons/lights/RectAreaLightUniformsLib.js')).RectAreaLightUniformsLib;
           RectAreaLightUniformsLib.init();
-          console.log('[线上展厅] 使用 CDN:', cdn.name);
+          console.log('[绾夸笂灞曞巺] 浣跨敤 CDN:', cdn.name);
           ok = true;
           break;
-        } catch (e2) { console.warn('CDN 失败', cdn.name, e2); }
+        } catch (e2) { console.warn('CDN 澶辫触', cdn.name, e2); }
       }
-      if (!ok) { showFatal('3D 引擎加载失败，请检查网络后刷新'); throw new Error('no engine'); }
+      if (!ok) { showFatal('3D 寮曟搸鍔犺浇澶辫触锛岃妫€鏌ョ綉缁滃悗鍒锋柊'); throw new Error('no engine'); }
     }
 
-    /* ================= 状态机 ================= */
+    /* ================= 鐘舵€佹満 ================= */
     const Mode = Object.freeze({ OVERVIEW: 0, TRANSITION: 1, DETAIL: 2 });
     const state = {
-      mode: Mode.OVERVIEW,   // 当前场景模式
-      devices: [],           // models.json 的设备列表
-      selectedIndex: -1,     // 当前选中的设备下标（-1 = 未选中）
-      highModel: null,       // 当前详情模式的高精度模型（可卸载）
-      loadToken: 0,          // 竞态令牌：新加载使旧加载失效
-      enterToken: 0,         // 进入流程令牌：返回/切换会使其失效
-      exitToken: 0,          // 退出流程令牌
-      userTouched: false,    // 用户是否已手动旋转/缩放详情相机（高模替换后不再强制重置视角）
+      mode: Mode.OVERVIEW,   // 褰撳墠鍦烘櫙妯″紡
+      devices: [],           // models.json 鐨勮澶囧垪琛?
+      selectedIndex: -1,     // 褰撳墠閫変腑鐨勮澶囦笅鏍囷紙-1 = 鏈€変腑锛?
+      highModel: null,       // 褰撳墠璇︽儏妯″紡鐨勯珮绮惧害妯″瀷锛堝彲鍗歌浇锛?
+      loadToken: 0,          // 绔炴€佷护鐗岋細鏂板姞杞戒娇鏃у姞杞藉け鏁?
+      enterToken: 0,         // 杩涘叆娴佺▼浠ょ墝锛氳繑鍥?鍒囨崲浼氫娇鍏跺け鏁?
+      exitToken: 0,          // 閫€鍑烘祦绋嬩护鐗?
+      userTouched: false,    // 鐢ㄦ埛鏄惁宸叉墜鍔ㄦ棆杞?缂╂斁璇︽儏鐩告満锛堥珮妯℃浛鎹㈠悗涓嶅啀寮哄埗閲嶇疆瑙嗚锛?
     };
 
-    /* ================= 双层渲染器（PC/移动端分级） ================= */
+    /* ================= 鍙屽眰娓叉煋鍣紙PC/绉诲姩绔垎绾э級 ================= */
     const app = document.getElementById('app');
     function makeRenderer(alpha, id) {
       let r;
       try { r = new THREE.WebGLRenderer({ antialias: PERF.antialias, alpha, powerPreference: 'high-performance' }); }
       catch (e1) {
         try { r = new THREE.WebGLRenderer({ antialias: false, alpha }); }
-        catch (e2) { showFatal('WebGL 不可用'); throw e2; }
+        catch (e2) { showFatal('WebGL 涓嶅彲鐢?); throw e2; }
       }
-      r.setPixelRatio(PERF.pixelRatio);   // PC≤2 / 移动≤1.5（按 PERF 分级）
+      r.setPixelRatio(PERF.pixelRatio);   // PC鈮? / 绉诲姩鈮?.5锛堟寜 PERF 鍒嗙骇锛?
       r.setSize(innerWidth, innerHeight);
       r.outputColorSpace = THREE.SRGBColorSpace;
-      r.toneMapping = THREE.ACESFilmicToneMapping;   // 电影级色调映射
+      r.toneMapping = THREE.ACESFilmicToneMapping;   // 鐢靛奖绾ц壊璋冩槧灏?
       r.toneMappingExposure = 1.0;
-      // 阴影：PC 开启；移动端关闭（显著降低 GPU 压力）
+      // 闃村奖锛歅C 寮€鍚紱绉诲姩绔叧闂紙鏄捐憲闄嶄綆 GPU 鍘嬪姏锛?
       r.shadowMap.enabled = PERF.shadows;
       if (PERF.shadows) r.shadowMap.type = THREE.PCFSoftShadowMap;
       r.domElement.id = id;
       app.appendChild(r.domElement);
       return r;
     }
-    // 底层：全景低模场景（背景不透明，可被 CSS 虚化）
+    // 搴曞眰锛氬叏鏅綆妯″満鏅紙鑳屾櫙涓嶉€忔槑锛屽彲琚?CSS 铏氬寲锛?
     const rendererLow = makeRenderer(false, 'low-canvas');
-    // 顶层：详情高精度模型（透明背景，叠加在底层上方）
+    // 椤跺眰锛氳鎯呴珮绮惧害妯″瀷锛堥€忔槑鑳屾櫙锛屽彔鍔犲湪搴曞眰涓婃柟锛?
     const rendererHigh = makeRenderer(true, 'high-canvas');
-    // WebGL 崩溃防护：context lost 时优雅降载（半分辨率+提示），避免直接崩溃重载
+    // WebGL 宕╂簝闃叉姢锛歝ontext lost 鏃朵紭闆呴檷杞斤紙鍗婂垎杈ㄧ巼+鎻愮ず锛夛紝閬垮厤鐩存帴宕╂簝閲嶈浇
     [rendererLow, rendererHigh].forEach(r => {
       r.domElement.addEventListener('webglcontextlost', e => {
         e.preventDefault();
-        console.warn('[线上展厅] WebGL context lost，降载恢复');
+        console.warn('[绾夸笂灞曞巺] WebGL context lost锛岄檷杞芥仮澶?);
         setTimeout(() => {
           try { r.setPixelRatio(1); r.setSize(innerWidth, innerHeight); } catch (err) {}
         }, 300);
       });
     });
 
-    // 共享相机 + 控制器（交互绑定顶层画布）
+    // 鍏变韩鐩告満 + 鎺у埗鍣紙浜や簰缁戝畾椤跺眰鐢诲竷锛?
     const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 2000);
     const controls = new OrbitControls(camera, rendererHigh.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.zoomToCursor = true;   // 滚轮以鼠标位置为定点放大（用户体验优化）
-    // 用户开始手动旋转/缩放 → 标记已交互（高模替换后不再强制重置视角，尊重用户当前视角）
+    controls.zoomToCursor = true;   // 婊氳疆浠ラ紶鏍囦綅缃负瀹氱偣鏀惧ぇ锛堢敤鎴蜂綋楠屼紭鍖栵級
+    // 鐢ㄦ埛寮€濮嬫墜鍔ㄦ棆杞?缂╂斁 鈫?鏍囪宸蹭氦浜掞紙楂樻ā鏇挎崲鍚庝笉鍐嶅己鍒堕噸缃瑙掞紝灏婇噸鐢ㄦ埛褰撳墠瑙嗚锛?
     controls.addEventListener('start', () => { if (state.mode === Mode.DETAIL) state.userTouched = true; });
 
-    /* ================= 全景场景（低模，常驻）—— 赛博朋克视觉 ================= */
+    /* ================= 鍏ㄦ櫙鍦烘櫙锛堜綆妯★紝甯搁┗锛夆€斺€?璧涘崥鏈嬪厠瑙嗚 ================= */
 
-    // ---------- ① 背景系统（纯色可调 + 雾色联动，默认淡蓝灰摄影棚） ----------
+    // ---------- 鈶?鑳屾櫙绯荤粺锛堢函鑹插彲璋?+ 闆捐壊鑱斿姩锛岄粯璁ゆ贰钃濈伆鎽勫奖妫氾級 ----------
     function setupBackground(scene) {
-      scene.background = new THREE.Color(0xa8adb5);   // 淡蓝灰背景墙纸（gui 可调）
-      scene.fog = new THREE.Fog(0xcbd5e1, 30, 120);    // 雾色与背景一致；默认雾化距离最大（远 120）
+      scene.background = new THREE.Color(0xa8adb5);   // 娣¤摑鐏拌儗鏅绾革紙gui 鍙皟锛?
+      scene.fog = new THREE.Fog(0xcbd5e1, 30, 120);    // 闆捐壊涓庤儗鏅竴鑷达紱榛樿闆惧寲璺濈鏈€澶э紙杩?120锛?
     }
 
-    // ---------- ② 灯光系统（高端展厅：顶部条形灯 + 中心聚光 + 冷白高对比） ----------
+    // ---------- 鈶?鐏厜绯荤粺锛堥珮绔睍鍘咃細椤堕儴鏉″舰鐏?+ 涓績鑱氬厜 + 鍐风櫧楂樺姣旓級 ----------
     function setupLights(scene, renderer) {
       const lights = [];
-      // 顶部条形灯（冷白 RectAreaLight 宽条形，明亮顶光）
+      // 椤堕儴鏉″舰鐏紙鍐风櫧 RectAreaLight 瀹芥潯褰紝鏄庝寒椤跺厜锛?
       const strip = new THREE.RectAreaLight(0xeaf2ff, 6, 16, 2.5);
       strip.position.set(0, 13, 0);
       strip.lookAt(0, 0, 0);
       scene.add(strip);
       lights.push(strip);
-      // 中心聚光灯（聚焦展台中心，冷白，高对比光影）
+      // 涓績鑱氬厜鐏紙鑱氱劍灞曞彴涓績锛屽喎鐧斤紝楂樺姣斿厜褰憋級
       const spot = new THREE.SpotLight(0xf0f7ff, 300, 120, 0.5, 0.35, 1.5);
       spot.position.set(0, 16, 4);
       spot.target.position.set(0, 0, 0);
@@ -501,14 +501,14 @@
         spot.shadow.camera.updateProjectionMatrix();
         spot.shadow.bias = -0.0005;
       }
-      // 极弱环境光（暗场，保中心聚光的高对比）
+      // 鏋佸急鐜鍏夛紙鏆楀満锛屼繚涓績鑱氬厜鐨勯珮瀵规瘮锛?
       scene.add(new THREE.AmbientLight(0xffffff, 0.12));
       return { lights };
     }
 
-    // ---------- ③ 地面系统（反光地板：微妙渐变 + 高反射，中性灰摄影棚地） ----------
+    // ---------- 鈶?鍦伴潰绯荤粺锛堝弽鍏夊湴鏉匡細寰娓愬彉 + 楂樺弽灏勶紝涓€х伆鎽勫奖妫氬湴锛?----------
     function setupGround(scene) {
-      // 反光地板渐变纹理：中心微亮 #eceff4 → 边缘中性灰 #c6cdd8（微妙渐变，无暗角）
+      // 鍙嶅厜鍦版澘娓愬彉绾圭悊锛氫腑蹇冨井浜?#eceff4 鈫?杈圭紭涓€х伆 #c6cdd8锛堝井濡欐笎鍙橈紝鏃犳殫瑙掞級
       const gcv = document.createElement('canvas');
       gcv.width = 1024; gcv.height = 1024;
       const gctx = gcv.getContext('2d');
@@ -519,8 +519,8 @@
       gctx.fillRect(0, 0, 1024, 1024);
       const gtex = new THREE.CanvasTexture(gcv);
       gtex.colorSpace = THREE.SRGBColorSpace;
-      // 大理石地面：巨大平面 200x200，清漆反光 + 渐变
-      // roughness 0.3 半光滑 / clearcoat 1.0 抛光 / envMapIntensity 1.5 强环境反射（微妙倒影感）
+      // 澶х悊鐭冲湴闈細宸ㄥぇ骞抽潰 200x200锛屾竻婕嗗弽鍏?+ 娓愬彉
+      // roughness 0.3 鍗婂厜婊?/ clearcoat 1.0 鎶涘厜 / envMapIntensity 1.5 寮虹幆澧冨弽灏勶紙寰鍊掑奖鎰燂級
       const marble = new THREE.Mesh(
         new THREE.PlaneGeometry(200, 200),
         new THREE.MeshPhysicalMaterial({
@@ -531,26 +531,26 @@
       );
       marble.rotation.x = -Math.PI / 2;
       marble.position.y = 0;
-      marble.receiveShadow = true;   // 接触阴影
+      marble.receiveShadow = true;   // 鎺ヨЕ闃村奖
       scene.add(marble);
       return { marble };
     }
 
-    // ---------- ④ 设备低模（直接落在大理石地面） ----------
-    const N = 8;                  // 设备数量（展厅固定 8 台）
-    const R = 5.0;                // 设备环绕半径
+    // ---------- 鈶?璁惧浣庢ā锛堢洿鎺ヨ惤鍦ㄥぇ鐞嗙煶鍦伴潰锛?----------
+    const N = 8;                  // 璁惧鏁伴噺锛堝睍鍘呭浐瀹?8 鍙帮級
+    const R = 5.0;                // 璁惧鐜粫鍗婂緞
     let bodyMesh, baseMesh, labels, defaultColors, devicePositions;
     const palette = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa29bfe, 0xff8a5c, 0x55efc4, 0xff6b8a, 0x74b9ff, 0xfd79a8, 0x00cec9];
     function setupDevices(scene) {
       devicePositions = [];
-      // 机身/底座：反射灯光更有质感的材质（metalness 0.3 / roughness 0.4），极淡青色自发光
+      // 鏈鸿韩/搴曞骇锛氬弽灏勭伅鍏夋洿鏈夎川鎰熺殑鏉愯川锛坢etalness 0.3 / roughness 0.4锛夛紝鏋佹贰闈掕壊鑷彂鍏?
       const deviceMat = new THREE.MeshStandardMaterial({
         roughness: 0.4, metalness: 0.3, color: 0xffffff,
         emissive: 0x00ffff, emissiveIntensity: 0.1
       });
       bodyMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.85, 0.85, 0.85), deviceMat, N);
       baseMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.62, 0.14, 24), deviceMat, N);
-      bodyMesh.castShadow = true;   // 投射阴影 → 大理石地面上的接触阴影
+      bodyMesh.castShadow = true;   // 鎶曞皠闃村奖 鈫?澶х悊鐭冲湴闈笂鐨勬帴瑙﹂槾褰?
       baseMesh.castShadow = true;
       defaultColors = [];
       const dummy = new THREE.Object3D();
@@ -558,17 +558,17 @@
         const a = (i / N) * Math.PI * 2;
         const p = new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R);
         devicePositions.push(p);
-        // 机身（直接落地）
+        // 鏈鸿韩锛堢洿鎺ヨ惤鍦帮級
         dummy.position.set(p.x, 0.55, p.z);
         dummy.rotation.set(0, -a + Math.PI / 2, 0);
         dummy.updateMatrix();
         bodyMesh.setMatrixAt(i, dummy.matrix);
-        // 底座
+        // 搴曞骇
         dummy.position.set(p.x, 0.07, p.z);
         dummy.rotation.set(0, 0, 0);
         dummy.updateMatrix();
         baseMesh.setMatrixAt(i, dummy.matrix);
-        // 实例颜色（区分设备）
+        // 瀹炰緥棰滆壊锛堝尯鍒嗚澶囷級
         const c = new THREE.Color(palette[i]);
         bodyMesh.setColorAt(i, c);
         baseMesh.setColorAt(i, c.clone().multiplyScalar(0.55));
@@ -577,15 +577,15 @@
       bodyMesh.instanceColor.needsUpdate = true;
       baseMesh.instanceColor.needsUpdate = true;
       scene.add(bodyMesh, baseMesh);
-      // 名称标签（Sprite 文字纹理，不受雾影响）
+      // 鍚嶇О鏍囩锛圫prite 鏂囧瓧绾圭悊锛屼笉鍙楅浘褰卞搷锛?
       labels = [];
       function makeLabel(text, i) {
         const cv = document.createElement('canvas');
-        // canvas 宽度按文本实际长度自适应（长名称如「22RS中间台+压机」不被裁剪）
+        // canvas 瀹藉害鎸夋枃鏈疄闄呴暱搴﹁嚜閫傚簲锛堥暱鍚嶇О濡傘€?2RS涓棿鍙?鍘嬫満銆嶄笉琚鍓級
         const LABEL_FONT = 'bold 34px "Microsoft YaHei", sans-serif';
         const meas = document.createElement('canvas').getContext('2d');
         meas.font = LABEL_FONT;
-        const textW = Math.ceil(meas.measureText(text).width) + 40;   // 左右留白 20px
+        const textW = Math.ceil(meas.measureText(text).width) + 40;   // 宸﹀彸鐣欑櫧 20px
         cv.width = Math.max(120, textW); cv.height = 64;
         const ctx = cv.getContext('2d');
         ctx.font = LABEL_FONT;
@@ -596,7 +596,7 @@
         ctx.fillStyle = '#eaf2ff'; ctx.fillText(text, cv.width / 2, 34);
         const tex = new THREE.CanvasTexture(cv);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
-        // 世界比例随画布宽度自适应（避免长文本被压扁），高度基准 0.55
+        // 涓栫晫姣斾緥闅忕敾甯冨搴﹁嚜閫傚簲锛堥伩鍏嶉暱鏂囨湰琚帇鎵侊級锛岄珮搴﹀熀鍑?0.55
         const aspect = cv.width / cv.height;
         sp.scale.set(0.55 * aspect, 0.55, 1);
         sp.position.set(devicePositions[i].x, 1.85, devicePositions[i].z);
@@ -608,22 +608,22 @@
       return makeLabel;
     }
 
-    /* ================= 全景场景初始化（模块化组合） ================= */
+    /* ================= 鍏ㄦ櫙鍦烘櫙鍒濆鍖栵紙妯″潡鍖栫粍鍚堬級 ================= */
     const sceneLow = new THREE.Scene();
     setupBackground(sceneLow);
     setupGround(sceneLow);
-    setupLights(sceneLow, rendererLow);      // 一盏聚光灯 + 阴影
+    setupLights(sceneLow, rendererLow);      // 涓€鐩忚仛鍏夌伅 + 闃村奖
     const makeLabel = setupDevices(sceneLow);
 
-    /* ================= 高模场景（详情，动态加载/卸载） ================= */
+    /* ================= 楂樻ā鍦烘櫙锛堣鎯咃紝鍔ㄦ€佸姞杞?鍗歌浇锛?================= */
     const sceneHigh = new THREE.Scene();
-    // 详情照明：摄影棚柔光箱（前 + 顶棚格栅灯，强度经实测校准）+ 弱环境光
+    // 璇︽儏鐓ф槑锛氭憚褰辨鏌斿厜绠憋紙鍓?+ 椤舵鏍兼爡鐏紝寮哄害缁忓疄娴嬫牎鍑嗭級+ 寮辩幆澧冨厜
     sceneHigh.add(new THREE.AmbientLight(0xffffff, 0.45));
     const hFront = new THREE.RectAreaLight(0xffffff, 12, 8, 8);
     hFront.position.set(0, 6, 10);
     hFront.lookAt(0, 0.3, 0);
     sceneHigh.add(hFront);
-    const hDir2 = new THREE.DirectionalLight(0xffffff, 2.5);   // 主光：照亮模型
+    const hDir2 = new THREE.DirectionalLight(0xffffff, 2.5);   // 涓诲厜锛氱収浜ā鍨?
     hDir2.position.set(6, 12, 8);
     sceneHigh.add(hDir2);
     const hBack = new THREE.RectAreaLight(0xffffff, 6, 8, 8);
@@ -635,42 +635,42 @@
     hTop.lookAt(0, 0, 0);
     sceneHigh.add(hTop);
 
-    /* ================= HDRI 环境（金属反射，解决发黑；不影响背景色） ================= */
-    // 用 RGBELoader 加载工业风 HDRI → PMREM 环境贴图 → 全景/详情共享 scene.environment
-    // scene.background 保持淡蓝灰摄影棚（#cbd5e1），HDRI 只作环境反射来源
-    // 优先级：polyhaven → 本地 hdr/ → jsdelivr；全部失败则跳过（聚光灯仍可照明）
+    /* ================= HDRI 鐜锛堥噾灞炲弽灏勶紝瑙ｅ喅鍙戦粦锛涗笉褰卞搷鑳屾櫙鑹诧級 ================= */
+    // 鐢?RGBELoader 鍔犺浇宸ヤ笟椋?HDRI 鈫?PMREM 鐜璐村浘 鈫?鍏ㄦ櫙/璇︽儏鍏变韩 scene.environment
+    // scene.background 淇濇寔娣¤摑鐏版憚褰辨锛?cbd5e1锛夛紝HDRI 鍙綔鐜鍙嶅皠鏉ユ簮
+    // 浼樺厛绾э細polyhaven 鈫?鏈湴 hdr/ 鈫?jsdelivr锛涘叏閮ㄥけ璐ュ垯璺宠繃锛堣仛鍏夌伅浠嶅彲鐓ф槑锛?
     const HDR_SOURCES = [
-      'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/studio_small_09_2k.hdr',   // 摄影棚风格：无缝360°、中性灰、柔光箱、均匀照明
+      'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/studio_small_09_2k.hdr',   // 鎽勫奖妫氶鏍硷細鏃犵紳360掳銆佷腑鎬х伆銆佹煍鍏夌銆佸潎鍖€鐓ф槑
       'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/industrial_sunset_puresky_1k.hdr',
       './hdr/studio.hdr',
       'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/equirectangular/royal_esplanade_1k.hdr'
     ];
     const rgbe = new RGBELoader();
     const pmremEnv = new THREE.PMREMGenerator(rendererLow);
-    // ① 立即用 RoomEnvironment 设置环境（同步，纯金属模型瞬间有反射，不会黑）
-    // ② 异步加载 HDRI，成功后替换（更真实；失败则保持 RoomEnvironment）
+    // 鈶?绔嬪嵆鐢?RoomEnvironment 璁剧疆鐜锛堝悓姝ワ紝绾噾灞炴ā鍨嬬灛闂存湁鍙嶅皠锛屼笉浼氶粦锛?
+    // 鈶?寮傛鍔犺浇 HDRI锛屾垚鍔熷悗鏇挎崲锛堟洿鐪熷疄锛涘け璐ュ垯淇濇寔 RoomEnvironment锛?
     const envFallback = pmremEnv.fromScene(new RoomEnvironment(), 0.04).texture;
     sceneLow.environment = envFallback;
     sceneHigh.environment = envFallback;
     function loadEnv(index) {
-      if (index >= HDR_SOURCES.length) { console.warn('[线上展厅] HDRI 加载失败，保持 RoomEnvironment 环境'); return; }
+      if (index >= HDR_SOURCES.length) { console.warn('[绾夸笂灞曞巺] HDRI 鍔犺浇澶辫触锛屼繚鎸?RoomEnvironment 鐜'); return; }
       rgbe.load(HDR_SOURCES[index], tex => {
         tex.mapping = THREE.EquirectangularReflectionMapping;
-        window.__hdrBg = tex;   // 保留 equirect 纹理（HDRI 背景用）
+        window.__hdrBg = tex;   // 淇濈暀 equirect 绾圭悊锛圚DRI 鑳屾櫙鐢級
         const env = pmremEnv.fromEquirectangular(tex).texture;
-        sceneLow.environment = env;    // ← 关键：全景金属反射光
-        sceneHigh.environment = env;   // ← 关键：详情金属反射光
-        // 背景同步为 HDRI（受「HDRI 背景」开关控制，默认开；关闭回淡蓝灰）
+        sceneLow.environment = env;    // 鈫?鍏抽敭锛氬叏鏅噾灞炲弽灏勫厜
+        sceneHigh.environment = env;   // 鈫?鍏抽敭锛氳鎯呴噾灞炲弽灏勫厜
+        // 鑳屾櫙鍚屾涓?HDRI锛堝彈銆孒DRI 鑳屾櫙銆嶅紑鍏虫帶鍒讹紝榛樿寮€锛涘叧闂洖娣¤摑鐏帮級
         if (params.hdrBackground !== false) sceneLow.background = tex;
         tex.needsUpdate = true;
         pmremEnv.dispose();
-        console.log('[线上展厅] HDRI 环境已应用:', HDR_SOURCES[index]);
+        console.log('[绾夸笂灞曞巺] HDRI 鐜宸插簲鐢?', HDR_SOURCES[index]);
       }, null, () => loadEnv(index + 1));
     }
     loadEnv(0);
-    // 环境强度全局控制（HDR 调节）
-    // 大厅（sceneLow）跟随滑条（默认 0.1，光线柔和不刺眼）；
-    // 详情（sceneHigh）不低于 1.5（金属模型必须有足够反射，否则发黑）
+    // 鐜寮哄害鍏ㄥ眬鎺у埗锛圚DR 璋冭妭锛?
+    // 澶у巺锛坰ceneLow锛夎窡闅忔粦鏉★紙榛樿 0.1锛屽厜绾挎煍鍜屼笉鍒虹溂锛夛紱
+    // 璇︽儏锛坰ceneHigh锛変笉浣庝簬 1.5锛堥噾灞炴ā鍨嬪繀椤绘湁瓒冲鍙嶅皠锛屽惁鍒欏彂榛戯級
     function setEnvIntensity(k) {
       const apply = (sc, v) => {
         sc.traverse(o => {
@@ -680,56 +680,56 @@
           }
         });
       };
-      apply(sceneLow, k);                 // 大厅：默认 0.1
-      apply(sceneHigh, Math.max(k, 2.0)); // 详情：至少 2.0（明亮清晰）
+      apply(sceneLow, k);                 // 澶у巺锛氶粯璁?0.1
+      apply(sceneHigh, Math.max(k, 2.0)); // 璇︽儏锛氳嚦灏?2.0锛堟槑浜竻鏅帮級
     }
 
     const loader = new GLTFLoader();
-    // Draco 解码（models/device-XX.glb 已用 gltf-transform Draco 压缩，体积缩小 6~14 倍）
+    // Draco 瑙ｇ爜锛坢odels/device-XX.glb 宸茬敤 gltf-transform Draco 鍘嬬缉锛屼綋绉缉灏?6~14 鍊嶏級
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('./lib/draco/');
-    // 不强制 type → wasm 优先（比 JS 快约 10 倍），加载失败自动回退 JS 解码器
+    // 涓嶅己鍒?type 鈫?wasm 浼樺厛锛堟瘮 JS 蹇害 10 鍊嶏級锛屽姞杞藉け璐ヨ嚜鍔ㄥ洖閫€ JS 瑙ｇ爜鍣?
     loader.setDRACOLoader(dracoLoader);
 
-    /* ================= 全景缩略模型（有模型→显示缩略，无模型→保留立方体） ================= */
-    const thumbObjects = [];   // 全景缩略模型（可点击）
-    // 缩略图已全部经 simplify+join 轻量化（mesh 数从数千降到 ~100、体积 2-6MB），
-    // 全景可直接显示；此黑名单暂空（原用于跳过超大缩略防移动端崩溃）
+    /* ================= 鍏ㄦ櫙缂╃暐妯″瀷锛堟湁妯″瀷鈫掓樉绀虹缉鐣ワ紝鏃犳ā鍨嬧啋淇濈暀绔嬫柟浣擄級 ================= */
+    const thumbObjects = [];   // 鍏ㄦ櫙缂╃暐妯″瀷锛堝彲鐐瑰嚮锛?
+    // 缂╃暐鍥惧凡鍏ㄩ儴缁?simplify+join 杞婚噺鍖栵紙mesh 鏁颁粠鏁板崈闄嶅埌 ~100銆佷綋绉?2-6MB锛夛紝
+    // 鍏ㄦ櫙鍙洿鎺ユ樉绀猴紱姝ら粦鍚嶅崟鏆傜┖锛堝師鐢ㄤ簬璺宠繃瓒呭ぇ缂╃暐闃茬Щ鍔ㄧ宕╂簝锛?
     const HEAVY_MODELS = [];
     const isHeavyModel = (model) => HEAVY_MODELS.includes(model);
-    // 加载单台缩略模型（有模型→显示缩略；失败/无文件→保留立方体占位）
+    // 鍔犺浇鍗曞彴缂╃暐妯″瀷锛堟湁妯″瀷鈫掓樉绀虹缉鐣ワ紱澶辫触/鏃犳枃浠垛啋淇濈暀绔嬫柟浣撳崰浣嶏級
     function loadOneThumb(d, i) {
       return new Promise(resolve => {
-        // 超大模型全景不加载 3D 缩略（保留立方体占位，防内存崩溃）
+        // 瓒呭ぇ妯″瀷鍏ㄦ櫙涓嶅姞杞?3D 缂╃暐锛堜繚鐣欑珛鏂逛綋鍗犱綅锛岄槻鍐呭瓨宕╂簝锛?
         if (isHeavyModel(d.model)) { resolve(); return; }
-        // 缩略路径：models/device-XX.glb → models/thumb/device-XX.glb；
-        // d1(model.glb) → models/thumb/device-01.glb（全景用轻量缩略，避免加载 11MB 原模型）
+        // 缂╃暐璺緞锛歮odels/device-XX.glb 鈫?models/thumb/device-XX.glb锛?
+        // d1(model.glb) 鈫?models/thumb/device-01.glb锛堝叏鏅敤杞婚噺缂╃暐锛岄伩鍏嶅姞杞?11MB 鍘熸ā鍨嬶級
         const thumbUrl = d.model.startsWith('models/')
           ? d.model.replace('models/', 'models/thumb/')
           : 'models/thumb/device-01.glb';
         loader.load(ver(thumbUrl), gltf => {
           const obj = gltf.scene || gltf.scenes[0];
-          markLogoNodes(obj);   // LOGO 打标保留显示，不参与缩放/落地计算
-          if (PERF.downgradeMaterial) downgradeMobileMaterial(obj);   // 移动端全景缩略同样 PBR→Phong
+          markLogoNodes(obj);   // LOGO 鎵撴爣淇濈暀鏄剧ず锛屼笉鍙備笌缂╂斁/钀藉湴璁＄畻
+          if (PERF.downgradeMaterial) downgradeMobileMaterial(obj);   // 绉诲姩绔叏鏅缉鐣ュ悓鏍?PBR鈫扨hong
           const box = boxExcl(obj);
           const size = box.getSize(new THREE.Vector3());
           if (size.x <= 0 || size.y <= 0 || size.z <= 0) { resolve(); return; }
-          // 缩放到占位立方体尺寸（0.85），最长边为基准
+          // 缂╂斁鍒板崰浣嶇珛鏂逛綋灏哄锛?.85锛夛紝鏈€闀胯竟涓哄熀鍑?
           const scale = 0.85 / Math.max(size.x, size.y, size.z);
           obj.scale.setScalar(scale);
-          // 缩放后重算包围盒（world matrix 需更新才会反映 scale）
+          // 缂╂斁鍚庨噸绠楀寘鍥寸洅锛坵orld matrix 闇€鏇存柊鎵嶄細鍙嶆槧 scale锛?
           obj.updateMatrixWorld(true);
           box.copy(boxExcl(obj));
           const c = box.getCenter(new THREE.Vector3());
           const p = devicePositions[i];
-          // 底部对齐地面（y=0）：-box.min.y 使模型完整立于地面，不埋入/不悬空
+          // 搴曢儴瀵归綈鍦伴潰锛坹=0锛夛細-box.min.y 浣挎ā鍨嬪畬鏁寸珛浜庡湴闈紝涓嶅煁鍏?涓嶆偓绌?
           obj.position.set(p.x - c.x, -box.min.y, p.z - c.z);
           obj.userData.deviceId = i;
-          obj.traverse(o => { if (o.isMesh) o.userData.deviceId = i; });   // 子网格可点击命中
+          obj.traverse(o => { if (o.isMesh) o.userData.deviceId = i; });   // 瀛愮綉鏍煎彲鐐瑰嚮鍛戒腑
           thumbObjects.push(obj);
           sceneLow.add(obj);
-          setEnvIntensity(params.envIntensity);   // 大厅缩略模型也应用 0.1（不刺眼）
-          // 隐藏对应立方体实例（矩阵缩放为 0）
+          setEnvIntensity(params.envIntensity);   // 澶у巺缂╃暐妯″瀷涔熷簲鐢?0.1锛堜笉鍒虹溂锛?
+          // 闅愯棌瀵瑰簲绔嬫柟浣撳疄渚嬶紙鐭╅樀缂╂斁涓?0锛?
           const hide = new THREE.Object3D();
           hide.position.set(p.x, 0, p.z);
           hide.scale.set(0.0001, 0.0001, 0.0001);
@@ -738,12 +738,12 @@
           baseMesh.setMatrixAt(i, hide.matrix);
           bodyMesh.instanceMatrix.needsUpdate = true;
           baseMesh.instanceMatrix.needsUpdate = true;
-          console.log('[线上展厅] 全景缩略已加载:', d.name, '(' + thumbUrl + ')');
+          console.log('[绾夸笂灞曞巺] 鍏ㄦ櫙缂╃暐宸插姞杞?', d.name, '(' + thumbUrl + ')');
           resolve();
-        }, null, () => { resolve(); });   // 无缩略文件 → 保留立方体占位
+        }, null, () => { resolve(); });   // 鏃犵缉鐣ユ枃浠?鈫?淇濈暀绔嬫柟浣撳崰浣?
       });
     }
-    // 渐进式加载缩略：从 fromIndex 起串行加载（前几台由首屏先行加载）
+    // 娓愯繘寮忓姞杞界缉鐣ワ細浠?fromIndex 璧蜂覆琛屽姞杞斤紙鍓嶅嚑鍙扮敱棣栧睆鍏堣鍔犺浇锛?
     function loadThumbsFrom(fromIndex, onProgress) {
       const total = state.devices.length;
       if (fromIndex >= total) return Promise.resolve();
@@ -752,11 +752,11 @@
           await loadOneThumb(state.devices[i], i);
           if (onProgress) onProgress((i + 1 - fromIndex) / (total - fromIndex));
         }
-        console.log('[线上展厅] 全部全景缩略加载完成');
+        console.log('[绾夸笂灞曞巺] 鍏ㄩ儴鍏ㄦ櫙缂╃暐鍔犺浇瀹屾垚');
       })();
     }
 
-    /* ================= 内存管理：递归释放模型资源 ================= */
+    /* ================= 鍐呭瓨绠＄悊锛氶€掑綊閲婃斁妯″瀷璧勬簮 ================= */
     function disposeObject(obj) {
       obj.traverse(o => {
         if (o.geometry) o.geometry.dispose();
@@ -775,16 +775,16 @@
       sceneHigh.remove(state.highModel);
       disposeObject(state.highModel);
       state.highModel = null;
-      console.log('[线上展厅] 已卸载高精度模型，内存已释放');
+      console.log('[绾夸笂灞曞巺] 宸插嵏杞介珮绮惧害妯″瀷锛屽唴瀛樺凡閲婃斁');
     }
 
-    // 标记「耐固LOGO」独立节点：不删除（LOGO 按模型位置正常显示），仅打标
-    // 使 boxExcl 在计算包围盒/取景时排除 LOGO，避免其拉偏旋转中心与缩放比例
+    // 鏍囪銆岃€愬浐LOGO銆嶇嫭绔嬭妭鐐癸細涓嶅垹闄わ紙LOGO 鎸夋ā鍨嬩綅缃甯告樉绀猴級锛屼粎鎵撴爣
+    // 浣?boxExcl 鍦ㄨ绠楀寘鍥寸洅/鍙栨櫙鏃舵帓闄?LOGO锛岄伩鍏嶅叾鎷夊亸鏃嬭浆涓績涓庣缉鏀炬瘮渚?
     function markLogoNodes(obj) {
       if (!obj) return;
       obj.traverse(o => {
         if (o.isMesh) return;
-        if (/耐固LOGO|LOGO\.\d|^LOGO$/i.test(o.name || '')) {
+        if (/鑰愬浐LOGO|LOGO\.\d|^LOGO$/i.test(o.name || '')) {
           let hasMesh = false;
           o.traverse(c => { if (c.isMesh) hasMesh = true; });
           if (hasMesh) { o.userData.isLogo = true; o.traverse(c => { c.userData.isLogo = true; }); }
@@ -792,28 +792,28 @@
       });
     }
 
-    // 计算排除 LOGO 子树的包围盒（LOGO 仍渲染显示，但不参与缩放/取景/落地计算）
+    // 璁＄畻鎺掗櫎 LOGO 瀛愭爲鐨勫寘鍥寸洅锛圠OGO 浠嶆覆鏌撴樉绀猴紝浣嗕笉鍙備笌缂╂斁/鍙栨櫙/钀藉湴璁＄畻锛?
     function boxExcl(obj) {
       const box = new THREE.Box3();
       obj.updateMatrixWorld(true);
       const stack = [obj];
       while (stack.length) {
         const n = stack.pop();
-        if (n.userData && n.userData.isLogo) continue;   // 跳过 LOGO 整棵子树
+        if (n.userData && n.userData.isLogo) continue;   // 璺宠繃 LOGO 鏁存５瀛愭爲
         if (n.isMesh) box.expandByObject(n);
         for (const c of n.children || []) stack.push(c);
       }
       return box;
     }
 
-    /* ================= 相机飞行（平滑缓动） ================= */
+    /* ================= 鐩告満椋炶锛堝钩婊戠紦鍔級 ================= */
     function easeInOutCubic(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
     function flyTo(pos, tgt, dur = 900) {
       return new Promise(res => {
         const p0 = camera.position.clone();
         const t0 = controls.target.clone();
         const start = performance.now();
-        controls.enabled = false;   // 飞行期间锁定交互
+        controls.enabled = false;   // 椋炶鏈熼棿閿佸畾浜や簰
         (function step(now) {
           const k = Math.min(1, (now - start) / dur);
           const e = easeInOutCubic(k);
@@ -826,10 +826,10 @@
       });
     }
 
-    // 全景视角 / 详情特写视角
+    // 鍏ㄦ櫙瑙嗚 / 璇︽儏鐗瑰啓瑙嗚
     function overviewView() {
-      // 初始视角：相机在 z+ 前方 (0,2.5,8)，视线焦点正对前排设备组中心 (0,0.8,3.8)
-      // → 打开画面中央即离相机最近的近处前排设备，后排设备在画面边缘
+      // 鍒濆瑙嗚锛氱浉鏈哄湪 z+ 鍓嶆柟 (0,2.5,8)锛岃绾跨劍鐐规瀵瑰墠鎺掕澶囩粍涓績 (0,0.8,3.8)
+      // 鈫?鎵撳紑鐢婚潰涓ぎ鍗崇鐩告満鏈€杩戠殑杩戝鍓嶆帓璁惧锛屽悗鎺掕澶囧湪鐢婚潰杈圭紭
       return { pos: new THREE.Vector3(0, 2.5, 8), tgt: new THREE.Vector3(0, 0.8, 3.8) };
     }
     function detailView(i) {
@@ -840,7 +840,7 @@
       return { pos, tgt };
     }
 
-    /* ================= 高亮选中设备（低模实例变色） ================= */
+    /* ================= 楂樹寒閫変腑璁惧锛堜綆妯″疄渚嬪彉鑹诧級 ================= */
     const HIGHLIGHT = new THREE.Color(0xffd54a);
     function highlightInstance(i) {
       for (let k = 0; k < N; k++) {
@@ -859,13 +859,13 @@
       baseMesh.instanceColor.needsUpdate = true;
     }
 
-    /* ================= 加载遮罩 ================= */
+    /* ================= 鍔犺浇閬僵 ================= */
     function setLoading(show, text, pct) {
       if (show) {
         overlay.classList.remove('hidden', 'error');
-        loadingText.textContent = text || '加载中…';
+        loadingText.textContent = text || '鍔犺浇涓€?;
         const raw = pct === undefined ? 0 : Math.round(pct * 100);
-        const p = Math.max(0, Math.min(100, raw));   // 钳制 0-100%（进度事件误差不会超过 100%）
+        const p = Math.max(0, Math.min(100, raw));   // 閽冲埗 0-100%锛堣繘搴︿簨浠惰宸笉浼氳秴杩?100%锛?
         progressBar.style.width = p + '%';
         progressPct.textContent = p + '%';
       } else {
@@ -873,14 +873,14 @@
       }
     }
 
-    /* ================= 详情面板 ================= */
+    /* ================= 璇︽儏闈㈡澘 ================= */
     const panel = document.getElementById('detail-panel');
     const panelName = panel.querySelector('.dp-name');
     const panelDesc = panel.querySelector('.dp-desc');
     const panelParams = panel.querySelector('.dp-params');
     const panelStatus = panel.querySelector('.dp-status');
     const dpMini = document.getElementById('dp-mini');
-    // 面板折叠：收起后只留迷你标签条，不遮挡模型
+    // 闈㈡澘鎶樺彔锛氭敹璧峰悗鍙暀杩蜂綘鏍囩鏉★紝涓嶉伄鎸℃ā鍨?
     function collapsePanel() {
       panel.classList.add('collapsed');
       panel.classList.remove('show');
@@ -903,7 +903,7 @@
       panelParams.innerHTML = '';
       const list = device.params && device.params.length ? device.params : [];
       if (!list.length) {
-        panelParams.innerHTML = '<tr><td colspan="2" style="text-align:left;color:rgba(232,236,244,.4)">暂无参数</td></tr>';
+        panelParams.innerHTML = '<tr><td colspan="2" style="text-align:left;color:rgba(232,236,244,.4)">鏆傛棤鍙傛暟</td></tr>';
       } else {
         list.forEach(it => {
           const tr = document.createElement('tr');
@@ -911,8 +911,8 @@
           panelParams.appendChild(tr);
         });
       }
-      setStatus('正在加载模型…', 'loading');
-      expandPanel();   // 进入新设备时确保面板展开
+      setStatus('姝ｅ湪鍔犺浇妯″瀷鈥?, 'loading');
+      expandPanel();   // 杩涘叆鏂拌澶囨椂纭繚闈㈡澘灞曞紑
     }
     function closePanel() {
       panel.classList.remove('show', 'collapsed');
@@ -924,8 +924,8 @@
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
-    /* ================= 动态加载高精度模型（带进度 + 竞态令牌） ================= */
-    // 纹理各向异性：拉近/斜视角时贴图不糊的关键（上限 8，兼顾移动端性能）
+    /* ================= 鍔ㄦ€佸姞杞介珮绮惧害妯″瀷锛堝甫杩涘害 + 绔炴€佷护鐗岋級 ================= */
+    // 绾圭悊鍚勫悜寮傛€э細鎷夎繎/鏂滆瑙掓椂璐村浘涓嶇硦鐨勫叧閿紙涓婇檺 8锛屽吋椤剧Щ鍔ㄧ鎬ц兘锛?
     function boostTextures(obj) {
       const maxAniso = rendererHigh.capabilities.getMaxAnisotropy();
       obj.traverse(o => {
@@ -943,8 +943,8 @@
         }
       });
     }
-    // 金属材质可见性增强：metalness=1 + roughness=1 的"粗糙纯金属"在环境不足时呈黑剪影
-    // → 提高 envMapIntensity + 略降 metalness（保留金属感，但让漫反射参与，防全黑）
+    // 閲戝睘鏉愯川鍙鎬у寮猴細metalness=1 + roughness=1 鐨?绮楃硻绾噾灞?鍦ㄧ幆澧冧笉瓒虫椂鍛堥粦鍓奖
+    // 鈫?鎻愰珮 envMapIntensity + 鐣ラ檷 metalness锛堜繚鐣欓噾灞炴劅锛屼絾璁╂极鍙嶅皠鍙備笌锛岄槻鍏ㄩ粦锛?
     function ensureMetalVisible(obj) {
       obj.traverse(o => {
         if (o.isMesh && o.material) {
@@ -958,8 +958,8 @@
         }
       });
     }
-    // 移动端材质降级：PBR(Standard/Physical) → Phong，移除环境贴图反射，
-    // 显著降低着色器/纹理开销（保留颜色与贴图；金属感由高光近似）
+    // 绉诲姩绔潗璐ㄩ檷绾э細PBR(Standard/Physical) 鈫?Phong锛岀Щ闄ょ幆澧冭创鍥惧弽灏勶紝
+    // 鏄捐憲闄嶄綆鐫€鑹插櫒/绾圭悊寮€閿€锛堜繚鐣欓鑹蹭笌璐村浘锛涢噾灞炴劅鐢遍珮鍏夎繎浼硷級
     function downgradeMobileMaterial(obj) {
       obj.traverse(o => {
         if (!o.isMesh || !o.material) return;
@@ -970,18 +970,18 @@
             color: (m.color || new THREE.Color(0xcccccc)).clone(),
             emissive: m.emissive ? m.emissive.clone() : new THREE.Color(0),
             emissiveIntensity: m.emissiveIntensity !== undefined ? m.emissiveIntensity : 0,
-            shininess: 40,               // 近似金属高光
+            shininess: 40,               // 杩戜技閲戝睘楂樺厜
             specular: new THREE.Color(0x666666),
             transparent: m.transparent === true,
             opacity: m.opacity !== undefined ? m.opacity : 1,
             side: m.side !== undefined ? m.side : THREE.FrontSide,
             depthWrite: m.depthWrite !== undefined ? m.depthWrite : true
           });
-          // 贴图保留（map/normalMap 等；none 则纯色）
+          // 璐村浘淇濈暀锛坢ap/normalMap 绛夛紱none 鍒欑函鑹诧級
           if (m.map) { phong.map = m.map; }
           if (m.normalMap) { phong.normalMap = m.normalMap; }
           if (m.alphaMap) { phong.alphaMap = m.alphaMap; }
-          phong.envMap = null;           // 移除环境反射（性能关键）
+          phong.envMap = null;           // 绉婚櫎鐜鍙嶅皠锛堟€ц兘鍏抽敭锛?
           phong.needsUpdate = true;
           if (m !== phong) m.dispose();
           return phong;
@@ -989,204 +989,209 @@
         o.material = Array.isArray(o.material) && o.material.length === 1 ? o.material[0] : o.material;
       });
     }
-    // 模型就位统一材质处理：PC 增强金属可见性；移动端降级 PBR→Phong（性能分级）
+    // 妯″瀷灏变綅缁熶竴鏉愯川澶勭悊锛歅C 澧炲己閲戝睘鍙鎬э紱绉诲姩绔檷绾?PBR鈫扨hong锛堟€ц兘鍒嗙骇锛?
     function adaptMaterial(obj) {
       if (PERF.downgradeMaterial) downgradeMobileMaterial(obj);
       else ensureMetalVisible(obj);
     }
     function loadHighModel(device) {
       const token = ++state.loadToken;
-      const enterTokenAtCall = state.enterToken;   // 捕获进入令牌：返回/切换会递增它 → 高模就绪后丢弃
+      const enterTokenAtCall = state.enterToken;   // 鎹曡幏杩涘叆浠ょ墝锛氳繑鍥?鍒囨崲浼氶€掑瀹?鈫?楂樻ā灏辩华鍚庝涪寮?
       return new Promise(resolve => {
-        // 缩略图（LOD0）：常规设备「先显低模缩略（秒出画面）→ 后台升级高模(LOD1)」；
-        // 超大/多 mesh 模型（HEAVY_MODELS）跳过 LOD0，直接加载高模（避免缩略+高模双份
-        // 大模型同时解码/渲染导致移动端 GPU/内存崩溃——「打开即退回主厅」即为此现象）
-        // d1(model.glb) → models/thumb/device-01.glb；dN → models/thumb/device-NN.glb
-        const thumbUrl = isHeavyModel(device.model) ? null
+        // 鍒嗙骇鍔犺浇锛?
+        //  PC锛圥ERF.upgradeHigh=true锛夛細鐩存帴鍔犺浇楂樻ā锛堣烦杩囦綆璐ㄧ缉鐣?鈫?鍦嗘煴鍦嗐€侀浂浠跺畬鏁淬€佺粏鑺傚叏淇濈暀锛?
+        //  绉诲姩绔紙upgradeHigh=false锛夛細鍙敤杞婚噺缂╃暐锛堢ǔ瀹氫笉宕╋級
+        // 绉诲姩绔缉鐣ヨ矾寰勶細models/device-XX.glb 鈫?models/thumb/device-XX.glb锛沝1(model.glb) 鈫?device-01.glb
+        const thumbUrl = PERF.upgradeHigh ? null
           : device.model.startsWith('models/')
             ? device.model.replace('models/', 'models/thumb/')
             : 'models/thumb/device-01.glb';
-        let firstLoaded = null;   // 第一段显示的模型（缩略/LOD0）
+        let firstLoaded = null;   // 绗竴娈垫樉绀虹殑妯″瀷锛堢缉鐣?LOD0锛屼粎绉诲姩绔娇鐢級
 
-        // 模型就位（处理材质 + 入场景）；任何路径都必须 resolve，避免 Loading 卡死
+        // 妯″瀷灏变綅锛堝鐞嗘潗璐?+ 鍏ュ満鏅級锛涗换浣曡矾寰勯兘蹇呴』 resolve锛岄伩鍏?Loading 鍗℃
         const finish = (obj) => {
           if (token !== state.loadToken) { sceneHigh.remove(obj); disposeObject(obj); resolve(null); return; }
-          markLogoNodes(obj);   // LOGO 打标保留显示（取景时经 boxExcl 排除，不影响旋转中心）
+          markLogoNodes(obj);   // LOGO 鎵撴爣淇濈暀鏄剧ず锛堝彇鏅椂缁?boxExcl 鎺掗櫎锛屼笉褰卞搷鏃嬭浆涓績锛?
           boostTextures(obj);
-          adaptMaterial(obj);   // 分级：PC 增强金属 / 移动端 PBR→Phong 降级
+          adaptMaterial(obj);   // 鍒嗙骇锛歅C 澧炲己閲戝睘 / 绉诲姩绔?PBR鈫扨hong 闄嶇骇
           setEnvIntensity(params.envIntensity);
           sceneHigh.add(obj);
           state.highModel = obj;
           resolve(obj);
         };
 
-        // 第二段：后台加载高模（LOD1），就绪后无缝替换缩略并释放缩略内存
-        // 注意：完全后台化 —— 不显示全屏遮罩（避免挡住已显示的缩略模型），替换无感
-        // 用 enterToken 判断「是否已被返回/切换打断」：进入流程中 mode 是 TRANSITION，
-        // 不能拿 mode 判断（直接加载高模时 enterDetail 仍在 await，mode 尚未变为 DETAIL）
-        const loadHigh = () => {
+        // 绗簩娈碉細鍚庡彴鍔犺浇楂樻ā锛圠OD1锛夛紝灏辩华鍚庢棤缂濇浛鎹㈢缉鐣ュ苟閲婃斁缂╃暐鍐呭瓨
+        // 娉ㄦ剰锛氬畬鍏ㄥ悗鍙板寲 鈥斺€?涓嶆樉绀哄叏灞忛伄缃╋紙閬垮厤鎸′綇宸叉樉绀虹殑缂╃暐妯″瀷锛夛紝鏇挎崲鏃犳劅
+        // 鐢?enterToken 鍒ゆ柇銆屾槸鍚﹀凡琚繑鍥?鍒囨崲鎵撴柇銆嶏細杩涘叆娴佺▼涓?mode 鏄?TRANSITION锛?
+        // 涓嶈兘鎷?mode 鍒ゆ柇锛堢洿鎺ュ姞杞介珮妯℃椂 enterDetail 浠嶅湪 await锛宮ode 灏氭湭鍙樹负 DETAIL锛?
+        const loadHigh = (allowRetry) => {
           loader.load(ver(device.model), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
-            if (state.enterToken !== enterTokenAtCall) {   // 已返回全景或切换到其它设备 → 丢弃
+            if (state.enterToken !== enterTokenAtCall) {   // 宸茶繑鍥炲叏鏅垨鍒囨崲鍒板叾瀹冭澶?鈫?涓㈠純
               const drop = gltf.scene || gltf.scenes[0];
               sceneHigh.remove(drop); disposeObject(drop);
               resolve(null);
               return;
             }
             const obj = gltf.scene || gltf.scenes[0];
-            // 替换：卸载缩略 → 显示高模（先记住缩略的居中平移量）
+            // 鏇挎崲锛氬嵏杞界缉鐣?鈫?鏄剧ず楂樻ā锛堝厛璁颁綇缂╃暐鐨勫眳涓钩绉婚噺锛?
             const prevPos = firstLoaded ? firstLoaded.position.clone() : null;
             if (firstLoaded) { sceneHigh.remove(firstLoaded); disposeObject(firstLoaded); firstLoaded = null; }
             finish(obj);
-            setLoading(false);                          // 保险：确保遮罩关闭
-            setStatus('模型已加载（高清）', 'ok');       // 状态栏更新，不遮罩
-            // 高模替换缩略后的取景处理：新 obj 的 position 是默认值，未继承缩略的居中平移，
-            // 否则模型会偏离旋转中心、360° 观察不顺
+            setLoading(false);                          // 淇濋櫓锛氱‘淇濋伄缃╁叧闂?
+            setStatus('妯″瀷宸插姞杞斤紙楂樻竻锛?, 'ok');       // 鐘舵€佹爮鏇存柊锛屼笉閬僵
+            // 楂樻ā鏇挎崲缂╃暐鍚庣殑鍙栨櫙澶勭悊锛氭柊 obj 鐨?position 鏄粯璁ゅ€硷紝鏈户鎵跨缉鐣ョ殑灞呬腑骞崇Щ锛?
+            // 鍚﹀垯妯″瀷浼氬亸绂绘棆杞腑蹇冦€?60掳 瑙傚療涓嶉『
             if (state.mode === Mode.DETAIL) {
               if (state.userTouched && prevPos) {
-                obj.position.copy(prevPos);   // 用户已手动调整视角 → 继承缩略居中平移，避免模型跳动
+                obj.position.copy(prevPos);   // 鐢ㄦ埛宸叉墜鍔ㄨ皟鏁磋瑙?鈫?缁ф壙缂╃暐灞呬腑骞崇Щ锛岄伩鍏嶆ā鍨嬭烦鍔?
               } else {
-                fitDetailView(obj);           // 未交互 → 重新精确取景（模型完整居中）
+                fitDetailView(obj);           // 鏈氦浜?鈫?閲嶆柊绮剧‘鍙栨櫙锛堟ā鍨嬪畬鏁村眳涓級
               }
             }
-            console.log('[线上展厅] 已升级为高清模型 (LOD1):', device.model);
+            console.log('[绾夸笂灞曞巺] 宸插崌绾т负楂樻竻妯″瀷 (LOD1):', device.model);
           }, e => {
             if (e && e.total) {
               if (!firstLoaded) {
-                // 无缩略（如设备1）：直接加载高模，显示进度条
-                setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
+                // 鏃犵缉鐣ワ紙濡傝澶?锛夛細鐩存帴鍔犺浇楂樻ā锛屾樉绀鸿繘搴︽潯
+                setLoading(true, '鍔犺浇 ' + device.name + '鈥?, e.loaded / e.total);
               } else {
-                console.log('[线上展厅] 高清模型加载中', (e.loaded / e.total * 100).toFixed(0) + '%');
+                console.log('[绾夸笂灞曞巺] 楂樻竻妯″瀷鍔犺浇涓?, (e.loaded / e.total * 100).toFixed(0) + '%');
               }
             }
           }, () => {
-            console.warn('[线上展厅] 高清模型失败，保留缩略模型 (LOD0)');
-            setLoading(false);   // 保险：确保遮罩关闭
-            if (!firstLoaded) resolve(null);   // 无缩略可保留 → 结束加载（防 Loading 卡死）
+            console.warn('[绾夸笂灞曞巺] 楂樻竻妯″瀷澶辫触' + (allowRetry ? '锛岄噸璇曚竴娆? : ''));
+            setLoading(false);   // 淇濋櫓锛氱‘淇濋伄缃╁叧闂?
+            if (allowRetry && token === state.loadToken) {
+              // 缃戠粶鎶栧姩鑷姩閲嶈瘯涓€娆★紙PC 鐩磋浇璺緞锛岄伩鍏?妯″瀷鏄剧ず涓嶅嚭鏉?锛?
+              setTimeout(() => loadHigh(false), 800);
+            } else if (!firstLoaded) {
+              resolve(null);   // 鏃犵缉鐣ュ彲淇濈暀 鈫?缁撴潫鍔犺浇锛堥槻 Loading 鍗℃锛?
+            }
           });
         };
 
         if (thumbUrl) {
-          // 第一段：先加载缩略（秒显，LOD0）
+          // 绗竴娈碉細鍏堝姞杞界缉鐣ワ紙绉掓樉锛孡OD0锛?
           loader.load(ver(thumbUrl), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
             const obj = gltf.scene || gltf.scenes[0];
             firstLoaded = obj;
             finish(obj);
-            // PC：后台升级高清模型（LOD1）；移动端保持缩略（PERF.upgradeHigh=false，单份低模最稳）
-            if (PERF.upgradeHigh) loadHigh();
+            // PC锛氬悗鍙板崌绾ч珮娓呮ā鍨嬶紙LOD1锛夛紱绉诲姩绔繚鎸佺缉鐣ワ紙PERF.upgradeHigh=false锛屽崟浠戒綆妯℃渶绋筹級
+            if (PERF.upgradeHigh) loadHigh(true);
           }, e => {
             if (e && e.total && token === state.loadToken) {
-              setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
+              setLoading(true, '鍔犺浇 ' + device.name + '鈥?, e.loaded / e.total);
             }
           }, () => {
-            // 缩略失败 → PC 直接加载高模；移动端由 resolve(null) 兜底（详情显示失败提示）
-            if (PERF.upgradeHigh) loadHigh(); else resolve(null);
+            // 缂╃暐澶辫触 鈫?PC 鐩存帴鍔犺浇楂樻ā锛涚Щ鍔ㄧ鐢?resolve(null) 鍏滃簳锛堣鎯呮樉绀哄け璐ユ彁绀猴級
+            if (PERF.upgradeHigh) loadHigh(true); else resolve(null);
           });
         } else {
-          // 无缩略文件 → 直接加载高模
-          loadHigh();
+          // 鏃犵缉鐣ユ枃浠讹紙PC 鐩磋浇楂樻ā锛夆啋 鐩存帴鍔犺浇楂樻ā锛屽け璐ヨ嚜鍔ㄩ噸璇曚竴娆?
+          loadHigh(true);
         }
       });
     }
 
-    /* ================= 模式切换（核心状态机逻辑） ================= */
+    /* ================= 妯″紡鍒囨崲锛堟牳蹇冪姸鎬佹満閫昏緫锛?================= */
     async function enterDetail(i) {
-      // 守卫：过渡中禁止新进入；已在详情且同一台设备则忽略
+      // 瀹堝崼锛氳繃娓′腑绂佹鏂拌繘鍏ワ紱宸插湪璇︽儏涓斿悓涓€鍙拌澶囧垯蹇界暐
       if (state.mode === Mode.TRANSITION) return;
       if (state.mode === Mode.DETAIL && state.selectedIndex === i) return;
 
       const token = ++state.enterToken;
       state.mode = Mode.TRANSITION;
       state.selectedIndex = i;
-      state.userTouched = false;   // 重置交互标志（新进入详情时高模就绪会重新取景）
+      state.userTouched = false;   // 閲嶇疆浜や簰鏍囧織锛堟柊杩涘叆璇︽儏鏃堕珮妯″氨缁細閲嶆柊鍙栨櫙锛?
       const device = state.devices[i];
 
       highlightInstance(i);
       syncSidebar(i);
-      openPanel(device);            // 面板立即显示（参数来自 JSON，不依赖模型）
+      openPanel(device);            // 闈㈡澘绔嬪嵆鏄剧ず锛堝弬鏁版潵鑷?JSON锛屼笉渚濊禆妯″瀷锛?
       rendererHigh.domElement.style.cursor = 'wait';
 
-      // 若之前详情模式有模型 → 先卸载（切换到另一台设备时）
+      // 鑻ヤ箣鍓嶈鎯呮ā寮忔湁妯″瀷 鈫?鍏堝嵏杞斤紙鍒囨崲鍒板彟涓€鍙拌澶囨椂锛?
       unloadHighModel();
 
-      setLoading(true, '飞入特写 · 加载 ' + device.name + '…', 0);
+      setLoading(true, '椋炲叆鐗瑰啓 路 鍔犺浇 ' + device.name + '鈥?, 0);
       const view = detailView(i);
       const flyP = flyTo(view.pos, view.tgt, 900);
       const loadP = loadHighModel(device);
 
       const [, model] = await Promise.all([flyP, loadP]);
-      if (token !== state.enterToken) { unloadHighModel(); return; }  // 已被返回/切换打断
+      if (token !== state.enterToken) { unloadHighModel(); return; }  // 宸茶杩斿洖/鍒囨崲鎵撴柇
 
-      // 背景虚化 + 高模特写取景（模型尺寸适配相机距离）
+      // 鑳屾櫙铏氬寲 + 楂樻ā鐗瑰啓鍙栨櫙锛堟ā鍨嬪昂瀵搁€傞厤鐩告満璺濈锛?
       app.classList.add('blur');
-      sceneHigh.background = new THREE.Color(0xb8bdc5);   // 详情亮灰背景（明亮清晰环境）
+      sceneHigh.background = new THREE.Color(0xb8bdc5);   // 璇︽儏浜伆鑳屾櫙锛堟槑浜竻鏅扮幆澧冿級
       if (model) {
         fitDetailView(model);
-        setStatus('模型已加载', 'ok');
+        setStatus('妯″瀷宸插姞杞?, 'ok');
       } else {
-        setStatus('模型加载失败（' + device.model + ' 不存在？）', 'err');
+        setStatus('妯″瀷鍔犺浇澶辫触锛? + device.model + ' 涓嶅瓨鍦紵锛?, 'err');
       }
       setLoading(false);
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.DETAIL;
-      document.body.classList.add('in-detail');   // 隐藏侧栏/分享，面板独占左下角
-      // 详情模式：隐藏全景缩略模型（背景已虚化，无需渲染）→ 大幅降低 GPU/内存峰值防崩溃
+      document.body.classList.add('in-detail');   // 闅愯棌渚ф爮/鍒嗕韩锛岄潰鏉跨嫭鍗犲乏涓嬭
+      // 璇︽儏妯″紡锛氶殣钘忓叏鏅缉鐣ユā鍨嬶紙鑳屾櫙宸茶櫄鍖栵紝鏃犻渶娓叉煋锛夆啋 澶у箙闄嶄綆 GPU/鍐呭瓨宄板€奸槻宕╂簝
       thumbObjects.forEach(o => { o.visible = false; });
-      console.log('[线上展厅] 进入详情模式:', device.name);
+      console.log('[绾夸笂灞曞巺] 杩涘叆璇︽儏妯″紡:', device.name);
     }
 
     async function exitDetail() {
-      // 允许在过渡中打断（用户点「返回」时可能仍在飞行/加载）
+      // 鍏佽鍦ㄨ繃娓′腑鎵撴柇锛堢敤鎴风偣銆岃繑鍥炪€嶆椂鍙兘浠嶅湪椋炶/鍔犺浇锛?
       if (state.mode === Mode.OVERVIEW) return;
       const token = ++state.exitToken;
-      state.enterToken++;           // 使进行中的进入流程失效
+      state.enterToken++;           // 浣胯繘琛屼腑鐨勮繘鍏ユ祦绋嬪け鏁?
       state.mode = Mode.TRANSITION;
 
-      setLoading(true, '返回全景…');
+      setLoading(true, '杩斿洖鍏ㄦ櫙鈥?);
       rendererHigh.domElement.style.cursor = 'wait';
 
-      unloadHighModel();            // ← 内存释放关键点
+      unloadHighModel();            // 鈫?鍐呭瓨閲婃斁鍏抽敭鐐?
       closePanel();
       clearHighlight();
       syncSidebar(-1);
       app.classList.remove('blur');
-      sceneHigh.background = null;   // 返回全景：清除详情背景（恢复透明叠加）
+      sceneHigh.background = null;   // 杩斿洖鍏ㄦ櫙锛氭竻闄よ鎯呰儗鏅紙鎭㈠閫忔槑鍙犲姞锛?
 
       const v = overviewView();
       await flyTo(v.pos, v.tgt, 900);
       if (token !== state.exitToken) return;
-      unloadHighModel();            // 兜底：处理加载竞态残留的模型
+      unloadHighModel();            // 鍏滃簳锛氬鐞嗗姞杞界珵鎬佹畫鐣欑殑妯″瀷
 
       state.selectedIndex = -1;
       setLoading(false);
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.OVERVIEW;
-      controls.minDistance = 4;   // 返回全景：恢复全景缩放范围（详情模式由 fitDetailView 设置）
+      controls.minDistance = 4;   // 杩斿洖鍏ㄦ櫙锛氭仮澶嶅叏鏅缉鏀捐寖鍥达紙璇︽儏妯″紡鐢?fitDetailView 璁剧疆锛?
       controls.maxDistance = 80;
-      document.body.classList.remove('in-detail');  // 恢复侧栏与分享按钮
-      // 返回全景：恢复显示缩略模型
+      document.body.classList.remove('in-detail');  // 鎭㈠渚ф爮涓庡垎浜寜閽?
+      // 杩斿洖鍏ㄦ櫙锛氭仮澶嶆樉绀虹缉鐣ユā鍨?
       thumbObjects.forEach(o => { o.visible = true; });
-      console.log('[线上展厅] 返回全景模式');
+      console.log('[绾夸笂灞曞巺] 杩斿洖鍏ㄦ櫙妯″紡');
     }
 
-    // 特写取景：①模型居中（旋转中心=模型中心，触控流畅的关键）
-    //          ②相机/目标点同步平移 + 距离适配
-    // 用 boxExcl：LOGO 打标后仍显示，但不参与取景（避免其远离主体时拉偏旋转中心）
+    // 鐗瑰啓鍙栨櫙锛氣憼妯″瀷灞呬腑锛堟棆杞腑蹇?妯″瀷涓績锛岃Е鎺ф祦鐣呯殑鍏抽敭锛?
+    //          鈶＄浉鏈?鐩爣鐐瑰悓姝ュ钩绉?+ 璺濈閫傞厤
+    // 鐢?boxExcl锛歀OGO 鎵撴爣鍚庝粛鏄剧ず锛屼絾涓嶅弬涓庡彇鏅紙閬垮厤鍏惰繙绂讳富浣撴椂鎷夊亸鏃嬭浆涓績锛?
     function fitDetailView(obj) {
       const box = boxExcl(obj);
       if (box.isEmpty()) return;
       const center = box.getCenter(new THREE.Vector3());
-      // 1) 模型居中：把包围盒中心平移到 (0, 0.3, 0)，让旋转轴对准模型中心
+      // 1) 妯″瀷灞呬腑锛氭妸鍖呭洿鐩掍腑蹇冨钩绉诲埌 (0, 0.3, 0)锛岃鏃嬭浆杞村鍑嗘ā鍨嬩腑蹇?
       obj.position.add(new THREE.Vector3(-center.x, 0.3 - center.y, -center.z));
       box.copy(boxExcl(obj));
       const r = box.getBoundingSphere(new THREE.Sphere()).radius;
       const want = Math.max(r / Math.tan((camera.fov * Math.PI) / 360) * 1.15, r * 2);
-      // 2) 目标点归位到模型中心，相机同步平移保持相对位置
+      // 2) 鐩爣鐐瑰綊浣嶅埌妯″瀷涓績锛岀浉鏈哄悓姝ュ钩绉讳繚鎸佺浉瀵逛綅缃?
       const oldT = controls.target.clone();
       controls.target.set(0, 0.3, 0);
       camera.position.add(controls.target.clone().sub(oldT));
-      // 3) 距离适配
+      // 3) 璺濈閫傞厤
       const dir = camera.position.clone().sub(controls.target);
       const cur = dir.length();
       if (Math.abs(want - cur) > 0.05) {
@@ -1201,12 +1206,12 @@
       controls.update();
     }
 
-    /* ================= 点击拾取（Raycaster → instanceId） ================= */
+    /* ================= 鐐瑰嚮鎷惧彇锛圧aycaster 鈫?instanceId锛?================= */
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let downPos = null;
     rendererHigh.domElement.addEventListener('pointerdown', e => { downPos = [e.clientX, e.clientY]; });
-    // 双击定点放大：命中模型处 → 目标点移到该处并拉近；双击空白 → 回到模型整体
+    // 鍙屽嚮瀹氱偣鏀惧ぇ锛氬懡涓ā鍨嬪 鈫?鐩爣鐐圭Щ鍒拌澶勫苟鎷夎繎锛涘弻鍑荤┖鐧?鈫?鍥炲埌妯″瀷鏁翠綋
     rendererHigh.domElement.addEventListener('dblclick', e => {
       if (state.mode !== Mode.DETAIL || !state.highModel) return;
       pointer.x = (e.clientX / innerWidth) * 2 - 1;
@@ -1214,10 +1219,10 @@
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObject(state.highModel, true);
       if (hits.length) {
-        controls.target.copy(hits[0].point);   // 定点：旋转/放大中心移到命中处
-        controls.dollyIn(1.35);                // 拉近一级
+        controls.target.copy(hits[0].point);   // 瀹氱偣锛氭棆杞?鏀惧ぇ涓績绉诲埌鍛戒腑澶?
+        controls.dollyIn(1.35);                // 鎷夎繎涓€绾?
       } else {
-        // 双击空白：回到模型整体视角（fitDetailView 重定位，排除 LOGO）
+        // 鍙屽嚮绌虹櫧锛氬洖鍒版ā鍨嬫暣浣撹瑙掞紙fitDetailView 閲嶅畾浣嶏紝鎺掗櫎 LOGO锛?
         const c = boxExcl(state.highModel).getCenter(new THREE.Vector3());
         controls.target.set(c.x, c.y, c.z);
       }
@@ -1226,7 +1231,7 @@
       if (!downPos) return;
       const dx = e.clientX - downPos[0], dy = e.clientY - downPos[1];
       downPos = null;
-      if (dx * dx + dy * dy > 36) return;   // 拖拽旋转不算点击
+      if (dx * dx + dy * dy > 36) return;   // 鎷栨嫿鏃嬭浆涓嶇畻鐐瑰嚮
       if (state.mode === Mode.TRANSITION) return;
       pointer.x = (e.clientX / innerWidth) * 2 - 1;
       pointer.y = -(e.clientY / innerHeight) * 2 + 1;
@@ -1240,7 +1245,7 @@
       enterDetail(id);
     });
 
-    /* ================= 设备列表（侧栏，与 3D 拾取双入口） ================= */
+    /* ================= 璁惧鍒楄〃锛堜晶鏍忥紝涓?3D 鎷惧彇鍙屽叆鍙ｏ級 ================= */
     function syncSidebar(i) {
       document.querySelectorAll('.device-tile').forEach((t, k) => {
         t.classList.toggle('active', k === i);
@@ -1258,35 +1263,35 @@
       });
     }
 
-    /* ================= 初始化：读 models.json → 构建全景 ================= */
+    /* ================= 鍒濆鍖栵細璇?models.json 鈫?鏋勫缓鍏ㄦ櫙 ================= */
     async function init() {
       try {
-        setLoading(true, '初始化中…', 0.08);
+        setLoading(true, '鍒濆鍖栦腑鈥?, 0.08);
         const r = await fetch('./models.json', { cache: 'no-store' });
         const data = await r.json();
         state.devices = data.devices || [];
-        if (!state.devices.length) { showFatal('models.json 中没有设备'); return; }
-        setLoading(true, '构建展厅…', 0.18);
+        if (!state.devices.length) { showFatal('models.json 涓病鏈夎澶?); return; }
+        setLoading(true, '鏋勫缓灞曞巺鈥?, 0.18);
         renderSidebar();
         state.devices.forEach((d, i) => makeLabel(d.name, i));
-        // 首屏：先加载前 2 台轻量缩略（快速出画面），遮罩显示真实进度
-        setLoading(true, '加载展厅模型…', 0.2);
+        // 棣栧睆锛氬厛鍔犺浇鍓?2 鍙拌交閲忕缉鐣ワ紙蹇€熷嚭鐢婚潰锛夛紝閬僵鏄剧ず鐪熷疄杩涘害
+        setLoading(true, '鍔犺浇灞曞巺妯″瀷鈥?, 0.2);
         await loadOneThumb(state.devices[0], 0);
-        setLoading(true, '加载展厅模型…', 0.55);
+        setLoading(true, '鍔犺浇灞曞巺妯″瀷鈥?, 0.55);
         if (state.devices[1]) await loadOneThumb(state.devices[1], 1);
         setLoading(false);
-        // 其余 6 台缩略后台逐台渐进加载（不阻塞进入，降低首屏内存峰值防崩溃）
+        // 鍏朵綑 6 鍙扮缉鐣ュ悗鍙伴€愬彴娓愯繘鍔犺浇锛堜笉闃诲杩涘叆锛岄檷浣庨灞忓唴瀛樺嘲鍊奸槻宕╂簝锛?
         setTimeout(() => {
-          loadThumbsFrom(2, p => console.log('[线上展厅] 缩略加载', Math.round(p * 100) + '%'));
+          loadThumbsFrom(2, p => console.log('[绾夸笂灞曞巺] 缂╃暐鍔犺浇', Math.round(p * 100) + '%'));
         }, 300);
-        console.log('[线上展厅] 全景就绪，剩余缩略后台加载');
+        console.log('[绾夸笂灞曞巺] 鍏ㄦ櫙灏辩华锛屽墿浣欑缉鐣ュ悗鍙板姞杞?);
       } catch (e) {
         console.error(e);
-        showFatal('models.json 加载失败：' + e.message);
+        showFatal('models.json 鍔犺浇澶辫触锛? + e.message);
       }
     }
 
-    /* ================= lil-gui 控制面板 ================= */
+    /* ================= lil-gui 鎺у埗闈㈡澘 ================= */
     const params = {
       autoRotate: true, autoRotateSpeed: 0.6,
       bloom: false, bloomStrength: 0.1, fogFar: 120, showFPS: false,
@@ -1301,39 +1306,39 @@
         }
       }
     };
-    const gui = new GUI({ title: '控制面板' });
-    gui.open();   // 控制面板始终展开显示内容（默认右上角）
-    const vf = gui.addFolder('视图');
-    vf.add(params, 'resetView').name('重置视角');
-    vf.add(params, 'autoRotate').name('自动旋转').onChange(v => { controls.autoRotate = v; });
-    vf.add(params, 'autoRotateSpeed', 0, 10, 0.1).name('旋转速度').onChange(v => { controls.autoRotateSpeed = v; });
-    const rf = gui.addFolder('渲染');
-    // 仅保留曝光（其余渲染参数用代码默认值，不暴露给用户）
-    rf.add(params, 'exposure', 0.5, 5, 0.05).name('曝光').onChange(v => { rendererLow.toneMappingExposure = 0.85; rendererHigh.toneMappingExposure = v; });
+    const gui = new GUI({ title: '鎺у埗闈㈡澘' });
+    gui.open();   // 鎺у埗闈㈡澘濮嬬粓灞曞紑鏄剧ず鍐呭锛堥粯璁ゅ彸涓婅锛?
+    const vf = gui.addFolder('瑙嗗浘');
+    vf.add(params, 'resetView').name('閲嶇疆瑙嗚');
+    vf.add(params, 'autoRotate').name('鑷姩鏃嬭浆').onChange(v => { controls.autoRotate = v; });
+    vf.add(params, 'autoRotateSpeed', 0, 10, 0.1).name('鏃嬭浆閫熷害').onChange(v => { controls.autoRotateSpeed = v; });
+    const rf = gui.addFolder('娓叉煋');
+    // 浠呬繚鐣欐洕鍏夛紙鍏朵綑娓叉煋鍙傛暟鐢ㄤ唬鐮侀粯璁ゅ€硷紝涓嶆毚闇茬粰鐢ㄦ埛锛?
+    rf.add(params, 'exposure', 0.5, 5, 0.05).name('鏇濆厜').onChange(v => { rendererLow.toneMappingExposure = 0.85; rendererHigh.toneMappingExposure = v; });
     vf.open(); rf.open();
 
-    /* ================= 显式应用默认参数（防缓存/时序问题，打开即生效） ================= */
-    // 默认最大雾化距离（far=120，滑条上限）+ 最小曝光（0.5，滑条下限）
+    /* ================= 鏄惧紡搴旂敤榛樿鍙傛暟锛堥槻缂撳瓨/鏃跺簭闂锛屾墦寮€鍗崇敓鏁堬級 ================= */
+    // 榛樿鏈€澶ч浘鍖栬窛绂伙紙far=120锛屾粦鏉′笂闄愶級+ 鏈€灏忔洕鍏夛紙0.5锛屾粦鏉′笅闄愶級
     sceneLow.fog.near = 30;
     sceneLow.fog.far = params.fogFar;
-    rendererLow.toneMappingExposure = 0.85;   // 展厅：明亮
-    rendererHigh.toneMappingExposure = params.exposure;   // 详情：保持现在设置
-    setEnvIntensity(params.envIntensity);   // 默认环境强度：大厅 0.1（柔和），详情 ≥1.5（防黑）
-    console.log('[线上展厅] 默认参数已应用: 雾化距离=' + sceneLow.fog.far + ' 曝光=' + params.exposure + ' (NAIGU EXPO V1.5)');
+    rendererLow.toneMappingExposure = 0.85;   // 灞曞巺锛氭槑浜?
+    rendererHigh.toneMappingExposure = params.exposure;   // 璇︽儏锛氫繚鎸佺幇鍦ㄨ缃?
+    setEnvIntensity(params.envIntensity);   // 榛樿鐜寮哄害锛氬ぇ鍘?0.1锛堟煍鍜岋級锛岃鎯?鈮?.5锛堥槻榛戯級
+    console.log('[绾夸笂灞曞巺] 榛樿鍙傛暟宸插簲鐢? 闆惧寲璺濈=' + sceneLow.fog.far + ' 鏇濆厜=' + params.exposure + ' (NAIGU EXPO V1.5)');
 
-    /* ================= 后处理：辉光通道（仅全景底层，极克制防过曝） ================= */
-    // UnrealBloomPass：strength 0.15（极弱光晕）/ radius 0.4 / threshold 1.0（仅超亮处发光）
-    // 避免发光部分过曝导致模型本体看不清；分辨率取屏幕一半兼顾移动端
+    /* ================= 鍚庡鐞嗭細杈夊厜閫氶亾锛堜粎鍏ㄦ櫙搴曞眰锛屾瀬鍏嬪埗闃茶繃鏇濓級 ================= */
+    // UnrealBloomPass锛歴trength 0.15锛堟瀬寮卞厜鏅曪級/ radius 0.4 / threshold 1.0锛堜粎瓒呬寒澶勫彂鍏夛級
+    // 閬垮厤鍙戝厜閮ㄥ垎杩囨洕瀵艰嚧妯″瀷鏈綋鐪嬩笉娓咃紱鍒嗚鲸鐜囧彇灞忓箷涓€鍗婂吋椤剧Щ鍔ㄧ
     const composer = new EffectComposer(rendererLow);
     composer.addPass(new RenderPass(sceneLow, camera));
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(Math.floor(innerWidth / 2), Math.floor(innerHeight / 2)),
-      0.1, 0.4, 0.8   // 展厅辉光 0.1（克制，控制面板可调）
+      0.1, 0.4, 0.8   // 灞曞巺杈夊厜 0.1锛堝厠鍒讹紝鎺у埗闈㈡澘鍙皟锛?
     );
     composer.addPass(bloomPass);
-    bloomPass.enabled = false;   // 取消辉光（gui 可手动开启）
+    bloomPass.enabled = false;   // 鍙栨秷杈夊厜锛坓ui 鍙墜鍔ㄥ紑鍚級
 
-    /* ================= FPS 统计（性能测试用） ================= */
+    /* ================= FPS 缁熻锛堟€ц兘娴嬭瘯鐢級 ================= */
     let fpsEl = null, fpsFrames = 0, fpsLast = performance.now();
     function updateFPS(now) {
       fpsFrames++;
@@ -1344,11 +1349,11 @@
       }
     }
 
-    /* ================= 渲染循环 / 自适应 / 快捷键 ================= */
+    /* ================= 娓叉煋寰幆 / 鑷€傚簲 / 蹇嵎閿?================= */
     rendererLow.setAnimationLoop(() => {
       controls.update();
-      composer.render();                                  // 全景（含辉光后处理）
-      rendererHigh.render(sceneHigh, camera);             // 详情高模（无后处理，保持清晰）
+      composer.render();                                  // 鍏ㄦ櫙锛堝惈杈夊厜鍚庡鐞嗭級
+      rendererHigh.render(sceneHigh, camera);             // 璇︽儏楂樻ā锛堟棤鍚庡鐞嗭紝淇濇寔娓呮櫚锛?
       updateFPS(performance.now());
     });
     window.addEventListener('resize', () => {
@@ -1365,9 +1370,9 @@
     document.getElementById('back-btn').addEventListener('click', exitDetail);
     document.getElementById('lobby-btn').addEventListener('click', exitDetail);
 
-    /* ================= 分享：公网链接 + 二维码（微信扫码打开） ================= */
-    // 公网正式地址（CloudBase 静态托管，自动部署，微信/手机可打开）
-    // 本地访问（localhost）时自动替换为该地址，避免把 localhost 发给别人打不开
+    /* ================= 鍒嗕韩锛氬叕缃戦摼鎺?+ 浜岀淮鐮侊紙寰俊鎵爜鎵撳紑锛?================= */
+    // 鍏綉姝ｅ紡鍦板潃锛圕loudBase 闈欐€佹墭绠★紝鑷姩閮ㄧ讲锛屽井淇?鎵嬫満鍙墦寮€锛?
+    // 鏈湴璁块棶锛坙ocalhost锛夋椂鑷姩鏇挎崲涓鸿鍦板潃锛岄伩鍏嶆妸 localhost 鍙戠粰鍒汉鎵撲笉寮€
     const PUBLIC_URL = 'https://baigukeji-d6g7omgxc78b09a62-1469467156.tcloudbaseapp.com/';
     function isLocalUrl(url) {
       return /localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|192\.168\.|^https?:\/\/10\.|^https?:\/\/172\.(1[6-9]|2\d|3[01])\./i.test(url);
@@ -1376,7 +1381,7 @@
       const cur = location.href;
       return isLocalUrl(cur) ? PUBLIC_URL : cur;
     }
-    // 二维码库加载（本地优先，CDN 回退）
+    // 浜岀淮鐮佸簱鍔犺浇锛堟湰鍦颁紭鍏堬紝CDN 鍥為€€锛?
     function loadQR(cb) {
       if (window.QRCode) return cb(window.QRCode);
       const urls = [
@@ -1401,15 +1406,15 @@
       const note = document.getElementById('share-note');
       input.value = url;
       note.textContent = isLocalUrl(location.href)
-        ? '当前是本地地址，已自动替换为公网链接（微信可打开）'
-        : '微信/手机扫码即可打开本页面';
+        ? '褰撳墠鏄湰鍦板湴鍧€锛屽凡鑷姩鏇挎崲涓哄叕缃戦摼鎺ワ紙寰俊鍙墦寮€锛?
+        : '寰俊/鎵嬫満鎵爜鍗冲彲鎵撳紑鏈〉闈?;
       loadQR(QR => {
         const qr = document.getElementById('share-qr');
         if (QR) {
           try { QR.toCanvas(qr, url, { width: 180, margin: 1, errorCorrectionLevel: 'M' }); }
-          catch (e) { note.textContent = '二维码生成失败，请直接复制链接发送。'; }
+          catch (e) { note.textContent = '浜岀淮鐮佺敓鎴愬け璐ワ紝璇风洿鎺ュ鍒堕摼鎺ュ彂閫併€?; }
         } else {
-          note.textContent = '二维码组件加载失败（可能离线），请直接复制链接发送。';
+          note.textContent = '浜岀淮鐮佺粍浠跺姞杞藉け璐ワ紙鍙兘绂荤嚎锛夛紝璇风洿鎺ュ鍒堕摼鎺ュ彂閫併€?;
         }
       });
     }
@@ -1422,19 +1427,19 @@
       const input = document.getElementById('share-url');
       const url = input.value;
       if (!url) return;
-      const done = () => { const b = document.getElementById('share-copy'); b.textContent = '✓ 已复制'; setTimeout(() => b.textContent = '复制', 1500); };
+      const done = () => { const b = document.getElementById('share-copy'); b.textContent = '鉁?宸插鍒?; setTimeout(() => b.textContent = '澶嶅埗', 1500); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done);
       else { input.select(); document.execCommand('copy'); done(); }
     });
 
-    // 启动：全景视角就位后渲染设备全景
+    // 鍚姩锛氬叏鏅瑙掑氨浣嶅悗娓叉煋璁惧鍏ㄦ櫙
     const v0 = overviewView();
     camera.position.copy(v0.pos);
     controls.target.copy(v0.tgt);
     controls.minDistance = 4;
-    controls.maxDistance = 80;   // 展台半径 15，允许拉远俯瞰全景
-    controls.autoRotate = true;  // 自动旋转默认开启（gui 可关）
-    controls.autoRotateSpeed = 0.6;  // 慢速旋转（约 3.6°/秒），先看清前排再缓缓展示
+    controls.maxDistance = 80;   // 灞曞彴鍗婂緞 15锛屽厑璁告媺杩滀刊鐬板叏鏅?
+    controls.autoRotate = true;  // 鑷姩鏃嬭浆榛樿寮€鍚紙gui 鍙叧锛?
+    controls.autoRotateSpeed = 0.6;  // 鎱㈤€熸棆杞紙绾?3.6掳/绉掞級锛屽厛鐪嬫竻鍓嶆帓鍐嶇紦缂撳睍绀?
     controls.update();
     init();
   </script>
