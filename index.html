@@ -371,19 +371,32 @@
     // ---------- 加载 three.js（本地优先，CDN 回退） ----------
     let THREE, OrbitControls, GLTFLoader, GUI, EffectComposer, RenderPass, UnrealBloomPass, RGBELoader, RoomEnvironment, DRACOLoader, RectAreaLightUniformsLib;
     try {
-      THREE = await import('./lib/three.module.js');
-      OrbitControls = (await import('./lib/OrbitControls.js')).OrbitControls;
-      GLTFLoader = (await import('./lib/GLTFLoader.js')).GLTFLoader;
-      GUI = (await import('./lib/lil-gui.esm.min.js')).default;
-      RGBELoader = (await import('./lib/RGBELoader.js')).RGBELoader;
-      RoomEnvironment = (await import('./lib/environments/RoomEnvironment.js')).RoomEnvironment;
-      DRACOLoader = (await import('./lib/DRACOLoader.js')).DRACOLoader;
-      RectAreaLightUniformsLib = (await import('./lib/RectAreaLightUniformsLib.js')).RectAreaLightUniformsLib;
+      // 并行加载所有引擎库（模块间无依赖 → 并发下载，首屏显著提速）
+      const [m3, mOC, mGLTF, mGUI, mRGBE, mRoom, mDraco, mRAL, mEC, mRP, mBloom] = await Promise.all([
+        import('./lib/three.module.js'),
+        import('./lib/OrbitControls.js'),
+        import('./lib/GLTFLoader.js'),
+        import('./lib/lil-gui.esm.min.js'),
+        import('./lib/RGBELoader.js'),
+        import('./lib/environments/RoomEnvironment.js'),
+        import('./lib/DRACOLoader.js'),
+        import('./lib/RectAreaLightUniformsLib.js'),
+        import('./lib/postprocessing/EffectComposer.js'),
+        import('./lib/postprocessing/RenderPass.js'),
+        import('./lib/postprocessing/UnrealBloomPass.js')
+      ]);
+      THREE = m3;
+      OrbitControls = mOC.OrbitControls;
+      GLTFLoader = mGLTF.GLTFLoader;
+      GUI = mGUI.default;
+      RGBELoader = mRGBE.RGBELoader;
+      RoomEnvironment = mRoom.RoomEnvironment;
+      DRACOLoader = mDraco.DRACOLoader;
+      RectAreaLightUniformsLib = mRAL.RectAreaLightUniformsLib;
       RectAreaLightUniformsLib.init();   // 柔光箱（RectAreaLight）着色器初始化
-      // 后处理（辉光通道）：EffectComposer + RenderPass + UnrealBloomPass
-      EffectComposer = (await import('./lib/postprocessing/EffectComposer.js')).EffectComposer;
-      RenderPass = (await import('./lib/postprocessing/RenderPass.js')).RenderPass;
-      UnrealBloomPass = (await import('./lib/postprocessing/UnrealBloomPass.js')).UnrealBloomPass;
+      EffectComposer = mEC.EffectComposer;
+      RenderPass = mRP.RenderPass;
+      UnrealBloomPass = mBloom.UnrealBloomPass;
       console.log('[线上展厅] 使用本地依赖');
     } catch (e) {
       console.warn('[线上展厅] 本地依赖不可用，尝试 CDN', e);
@@ -1463,17 +1476,14 @@
         setLoading(true, '构建展厅…', 0.18);
         renderSidebar();
         state.devices.forEach((d, i) => makeLabel(d.name, i));
-        // 首屏：先加载前 2 台轻量缩略（快速出画面），遮罩显示真实下载百分比
-        setLoading(true, '加载展厅模型…', 0.2);
-        await loadOneThumb(state.devices[0], 0, p => setLoading(true, '加载展厅模型…', 0.2 + p * 0.35));
-        setLoading(true, '加载展厅模型…', 0.6);
-        if (state.devices[1]) await loadOneThumb(state.devices[1], 1, p => setLoading(true, '加载展厅模型…', 0.6 + p * 0.35));
-        setLoading(false);
-        // 其余 6 台缩略后台逐台渐进加载（不阻塞进入，降低首屏内存峰值防崩溃）
+        // 首屏提速：数据就绪立即进入全景（不等待任何缩略模型下载）；
+        // 缩略模型全部在后台逐台加载，加载完成一台替换一个立方体（立即可见占位+标签可交互）
+        setLoading(true, '进入展厅…', 0.6);
         setTimeout(() => {
-          loadThumbsFrom(2, p => console.log('[线上展厅] 缩略加载', Math.round(p * 100) + '%'));
-        }, 300);
-        console.log('[线上展厅] 全景就绪，剩余缩略后台加载');
+          loadThumbsFrom(0);
+        }, 50);
+        setLoading(false);
+        console.log('[线上展厅] 全景就绪，缩略模型后台加载中');
       } catch (e) {
         console.error(e);
         showFatal('models.json 加载失败：' + e.message);
