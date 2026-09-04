@@ -55,7 +55,7 @@
     /* 收起状态：面板滑出屏幕（模型不被遮挡） */
     #detail-panel.collapsed { transform: translateX(-130%); opacity: 0; pointer-events: none; }
     #detail-panel .dp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    #detail-panel .dp-name { font-size: 19px; font-weight: 700; }
+    #detail-panel .dp-name { font-size: 19px; font-weight: 700; flex: 1; min-width: 0; line-height: 1.35; word-break: break-all; }
     #dp-collapse {
       background: rgba(255,255,255,.08); color: #aab4c8; border: 1px solid rgba(255,255,255,.12);
       border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; line-height: 1;
@@ -156,7 +156,8 @@
       }
       #device-panel h3 { display: none; }
       #device-list { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; overflow-y: hidden; }
-      .device-tile { flex: 0 0 72px; margin-bottom: 0; padding: 6px; text-align: center; }
+      .device-tile { flex: 0 0 auto; min-width: 72px; max-width: 132px; margin-bottom: 0; padding: 6px; text-align: center; }
+      .device-tile .dname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     }
 
     #share-btn {
@@ -349,7 +350,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 12;
+    const ASSET_VER = 13;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -561,17 +562,24 @@
       labels = [];
       function makeLabel(text, i) {
         const cv = document.createElement('canvas');
-        cv.width = 256; cv.height = 64;
+        // canvas 宽度按文本实际长度自适应（长名称如「22RS中间台+压机」不被裁剪）
+        ctx_font = 'bold 34px "Microsoft YaHei", sans-serif';
+        const meas = document.createElement('canvas').getContext('2d');
+        meas.font = ctx_font;
+        const textW = Math.ceil(meas.measureText(text).width) + 40;   // 左右留白 20px
+        cv.width = Math.max(120, textW); cv.height = 64;
         const ctx = cv.getContext('2d');
-        ctx.font = 'bold 34px "Microsoft YaHei", sans-serif';
+        ctx.font = ctx_font;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, 256, 64);
+        ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, cv.width, 64);
         ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 6;
-        ctx.strokeText(text, 128, 34);
-        ctx.fillStyle = '#eaf2ff'; ctx.fillText(text, 128, 34);
+        ctx.strokeText(text, cv.width / 2, 34);
+        ctx.fillStyle = '#eaf2ff'; ctx.fillText(text, cv.width / 2, 34);
         const tex = new THREE.CanvasTexture(cv);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
-        sp.scale.set(2.2, 0.55, 1);
+        // 世界比例随画布宽度自适应（避免长文本被压扁），高度基准 0.55
+        const aspect = cv.width / cv.height;
+        sp.scale.set(0.55 * aspect, 0.55, 1);
         sp.position.set(devicePositions[i].x, 1.85, devicePositions[i].z);
         sp.userData.deviceId = i;
         sp.renderOrder = 10;
