@@ -732,13 +732,15 @@
         }, null, () => { resolve(); });   // 无缩略文件 → 保留立方体占位
       });
     }
-    // 渐进式加载全部缩略：一台台串行加载，首台尽快出画面，后续在后台逐台补齐
-    // （避免首屏一次性并发下载全部缩略图阻塞；wasm 解码器亦更快）
-    function loadThumbs() {
-      if (!state.devices.length) return;
-      (async () => {
-        for (let i = 0; i < state.devices.length; i++) {
+    // 渐进式加载全部缩略：一台台串行加载，逐台推进进度条（初始化遮罩内完成，
+    // 用户看到真实百分比推进，而非一直 0% 后突然进入）
+    function loadThumbs(onProgress) {
+      if (!state.devices.length) return Promise.resolve();
+      return (async () => {
+        const total = state.devices.length;
+        for (let i = 0; i < total; i++) {
           await loadOneThumb(state.devices[i], i);
+          if (onProgress) onProgress((i + 1) / total);
         }
         console.log('[线上展厅] 全部全景缩略加载完成');
       })();
@@ -1212,17 +1214,21 @@
     /* ================= 初始化：读 models.json → 构建全景 ================= */
     async function init() {
       try {
+        setLoading(true, '初始化中…', 0.08);
         const r = await fetch('./models.json', { cache: 'no-store' });
         const data = await r.json();
         state.devices = data.devices || [];
         if (!state.devices.length) { showFatal('models.json 中没有设备'); return; }
+        setLoading(true, '构建展厅…', 0.18);
         renderSidebar();
         state.devices.forEach((d, i) => makeLabel(d.name, i));
-        // 全景就绪，隐藏加载遮罩
+        // 进度：引擎+数据已就绪 → 25%，剩余 75% 随缩略模型加载真实推进
+        setLoading(true, '加载展厅模型…', 0.25);
+        // 缩略模型在初始化遮罩内加载：逐台推进百分比，全部完成才进入展厅
+        // （8 台缩略共约 24MB，进度条 25%→100% 清晰反馈，避免"0% 卡住"假象）
+        await loadThumbs(p => setLoading(true, '加载展厅模型…', 0.25 + p * 0.75));
         setLoading(false);
-        // 缩略模型延迟后台加载（不阻塞首屏；无缩略则保留立方体）
-        setTimeout(() => loadThumbs(), 1500);
-        console.log('[线上展厅] 全景就绪，共 ' + state.devices.length + ' 台设备（缩略模型延迟加载）');
+        console.log('[线上展厅] 全景就绪，共 ' + state.devices.length + ' 台设备（缩略模型加载完成）');
       } catch (e) {
         console.error(e);
         showFatal('models.json 加载失败：' + e.message);
