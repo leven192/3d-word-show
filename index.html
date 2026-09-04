@@ -350,7 +350,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 17;
+    const ASSET_VER = 18;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -935,11 +935,12 @@
       const token = ++state.loadToken;
       const enterTokenAtCall = state.enterToken;   // 捕获进入令牌：返回/切换会递增它 → 高模就绪后丢弃
       return new Promise(resolve => {
-        // 缩略图（LOD0）：仅当缩略图明显小于高模时使用「先显缩略+后台升级」；
-        // d1(model.glb) 缩略与高模同源且不小 → 详情直接加载高模（进度条 0-100% 真实反馈，总下载更少）
+        // 缩略图（LOD0）：所有设备统一「先显低模缩略（秒出画面）→ 后台升级高模(LOD1)」
+        // d1(model.glb) → models/thumb/device-01.glb；dN → models/thumb/device-NN.glb
+        // 全景阶段已加载过缩略（命中浏览器缓存），进入详情几乎瞬时出画面
         const thumbUrl = device.model.startsWith('models/')
           ? device.model.replace('models/', 'models/thumb/')
-          : null;
+          : 'models/thumb/device-01.glb';
         const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
         let firstLoaded = null;   // 第一段显示的模型（缩略/LOD0）
 
