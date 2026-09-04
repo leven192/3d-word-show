@@ -563,13 +563,13 @@
       function makeLabel(text, i) {
         const cv = document.createElement('canvas');
         // canvas 宽度按文本实际长度自适应（长名称如「22RS中间台+压机」不被裁剪）
-        ctx_font = 'bold 34px "Microsoft YaHei", sans-serif';
+        const LABEL_FONT = 'bold 34px "Microsoft YaHei", sans-serif';
         const meas = document.createElement('canvas').getContext('2d');
-        meas.font = ctx_font;
+        meas.font = LABEL_FONT;
         const textW = Math.ceil(meas.measureText(text).width) + 40;   // 左右留白 20px
         cv.width = Math.max(120, textW); cv.height = 64;
         const ctx = cv.getContext('2d');
-        ctx.font = ctx_font;
+        ctx.font = LABEL_FONT;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillRect(0, 0, cv.width, 64);
         ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 6;
