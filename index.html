@@ -1397,11 +1397,13 @@
           borrowed.position.set(0, 0, 0);     // 归零（fitDetailView 会重新居中取景）
           borrowed.rotation.set(0, 0, 0);
           firstLoaded = borrowed;
+          console.log('[进入详情] 借用全景缩略秒显:', device.name);
           setProgTarget(1);
           finish(borrowed);
           loadHigh(true);   // 后台升级高清（无感替换，秒进后细节渐补）
           return;
         }
+        console.log('[进入详情] 无缩略可借用，走下载路径:', device.name);
         // 无借用缩略（全景未加载完就点击）：
         //  PC → 直接下载高清高模（一次到位，跳过 mobile 中转，避免 low→mid→high 重复下载）
         //  移动端 → 下载轻量 mobile（中模，够用且不崩）
