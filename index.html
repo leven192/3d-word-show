@@ -217,22 +217,6 @@
     #loading-overlay.error .spinner { border-top-color: #ff6b6b; }
     #loading-overlay.error #loading-text { color: #ff6b6b; }
 
-    /* ========== 详情内高模加载进度条（顶部细条，不遮模型画面） ========== */
-    #hi-progress {
-      position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-      z-index: 25; width: min(340px, 80vw);
-      background: rgba(16,20,30,.82); border: 1px solid rgba(255,255,255,.14);
-      border-radius: 20px; padding: 6px 14px;
-      display: flex; align-items: center; gap: 10px;
-      box-shadow: 0 6px 20px rgba(0,0,0,.35);
-      transition: opacity .3s;
-    }
-    #hi-progress.hidden { opacity: 0; pointer-events: none; }
-    #hi-label { color: #e8ecf4; font-size: 12px; font-weight: 600; white-space: nowrap; }
-    #hi-bar { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; }
-    #hi-bar::after { content: ''; display: block; height: 100%; width: var(--w, 0%); background: linear-gradient(90deg,#4da3ff,#7c6bff); transition: width .15s; }
-    #hi-pct { color: #9fc6ff; font-size: 12px; font-weight: 700; min-width: 34px; text-align: right; }
-
     .lg { z-index: 5 !important; }
   </style>
   <!-- 兼容性检测（所有浏览器都会执行，早于 module 脚本）：
@@ -309,12 +293,6 @@
   <button id="lobby-btn" title="返回大厅">⌂ 返回大厅</button>
 
   <!-- 详情内高模加载进度条（顶部细条，不遮画面；低模显示时同步展示高清下载进度） -->
-  <div id="hi-progress" class="hidden">
-    <span id="hi-label">加载高模</span>
-    <div id="hi-bar"></div>
-    <span id="hi-pct">0%</span>
-  </div>
-
   <div id="loading-overlay">
     <div class="spinner"></div>
     <div id="loading-text">初始化中…</div>
@@ -357,17 +335,9 @@
     const loadingText = document.getElementById('loading-text');
     const progressBar = document.getElementById('progress-bar');
     const progressPct = document.getElementById('progress-pct');
-    const hiProgress = document.getElementById('hi-progress');
-    const hiBar = document.getElementById('hi-bar');
-    const hiPct = document.getElementById('hi-pct');
-    // 详情内高模加载进度条（顶部细条）：pct 0-100，null 隐藏
-    function showHiProgress(pct) {
-      if (pct == null) { hiProgress.classList.add('hidden'); return; }
-      hiProgress.classList.remove('hidden');
-      const p = Math.max(0, Math.min(100, Math.round(pct * 100)));
-      hiBar.style.setProperty('--w', p + '%');
-      hiPct.textContent = p + '%';
-    }
+    // 顶部进度条已移除（保留参数面板 dp-status 的百分比加载状态）。
+    // 此函数保留为空实现以兼容调用点。
+    function showHiProgress() {}
 
     /* ============ PC / 移动端性能分级（全局） ============
      * isMobile：UA 或屏幕宽度 <768px 判定
