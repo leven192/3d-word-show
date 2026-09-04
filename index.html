@@ -691,6 +691,93 @@
     // 不强制 type → wasm 优先（比 JS 快约 10 倍），加载失败自动回退 JS 解码器
     loader.setDRACOLoader(dracoLoader);
 
+    /* ============ IndexedDB 模型缓存（ArrayBuffer 存取，全静默降级） ============ */
+    const IDB_NAME = 'ng3d-cache', IDB_STORE = 'models';
+    let idbReady = false, idbDb = null;
+    function openIdb() {
+      return new Promise(res => {
+        if (idbReady) return res(idbDb);
+        if (!window.indexedDB) return res(null);
+        let req;
+        try { req = window.indexedDB.open(IDB_NAME, 1); } catch (e) { return res(null); }
+        req.onupgradeneeded = () => {
+          try {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+          } catch (e) {}
+        };
+        req.onsuccess = () => { idbDb = req.result; idbReady = true; res(idbDb); };
+        req.onerror = () => res(null);
+        req.onblocked = () => res(null);
+      });
+    }
+    // 读取缓存 ArrayBuffer；失败/未命中返回 null（不抛错）
+    async function idbGet(key) {
+      try {
+        const db = await openIdb();
+        if (!db) return null;
+        return await new Promise(res => {
+          try {
+            const tx = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
+            tx.onsuccess = () => res(tx.result instanceof ArrayBuffer ? tx.result : null);
+            tx.onerror = () => res(null);
+          } catch (e) { res(null); }
+        });
+      } catch (e) { return null; }
+    }
+    // 写入缓存；失败静默忽略
+    async function idbPut(key, buffer) {
+      try {
+        const db = await openIdb();
+        if (!db) return;
+        await new Promise(res => {
+          try {
+            const tx = db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put(buffer, key);
+            tx.onsuccess = () => res();
+            tx.onerror = () => res();
+          } catch (e) { res(); }
+        });
+      } catch (e) {}
+    }
+
+    /* 缓存优先的 GLB 加载（替代 loader.load）：
+     * 1) IndexedDB 命中 → loader.parse() 直接解析（无网络请求）
+     * 2) 未命中 → XHR 网络下载（带进度）→ 写入 IndexedDB → parse
+     * 3) IndexedDB 读写失败 → 静默降级纯网络加载，不阻断渲染
+     */
+    function loadGLB(url, onLoad, onProgress, onError) {
+      let done = false;
+      const safeLoad = (buf) => {
+        if (done) return; done = true;
+        try { loader.parse(buf, '', onLoad, onError); }
+        catch (e) { if (onError) onError(e); }
+      };
+      (async () => {
+        // 1) 尝试缓存
+        let buf = null;
+        try { buf = await idbGet(url); } catch (e) { buf = null; }
+        if (buf) { safeLoad(buf); return; }
+        // 2) 网络下载（XHR 支持进度）
+        try {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', url, true);
+          xhr.responseType = 'arraybuffer';
+          xhr.onprogress = e => { if (onProgress && e.lengthComputable) onProgress({ loaded: e.loaded, total: e.total }); };
+          xhr.onload = () => {
+            if (xhr.status !== 200 && xhr.status !== 0) { if (onError) onError(); return; }
+            const ab = xhr.response;
+            if (!ab) { if (onError) onError(); return; }
+            // 3) 写入缓存（失败忽略，不阻断）
+            idbPut(url, ab);
+            safeLoad(ab);
+          };
+          xhr.onerror = () => { if (onError) onError(); };
+          xhr.ontimeout = () => { if (onError) onError(); };
+          xhr.send();
+        } catch (e) { if (onError) onError(); }
+      })();
+    }
+
     /* ================= 全景缩略模型（有模型→显示缩略，无模型→保留立方体） ================= */
     const thumbObjects = [];   // 全景缩略模型（可点击）
     // 缩略图已全部经 simplify+join 轻量化（mesh 数从数千降到 ~100、体积 2-6MB），
@@ -707,7 +794,7 @@
         const thumbUrl = d.model.startsWith('models/')
           ? d.model.replace('models/', 'models/thumb/')
           : 'models/thumb/device-01.glb';
-        loader.load(ver(thumbUrl), gltf => {
+        loadGLB(ver(thumbUrl), gltf => {
           const obj = gltf.scene || gltf.scenes[0];
           markLogoNodes(obj);   // LOGO 打标保留显示，不参与缩放/落地计算
           if (PERF.downgradeMaterial) downgradeMobileMaterial(obj);   // 移动端全景缩略同样 PBR→Phong
@@ -1025,7 +1112,7 @@
         // 用 enterToken 判断「是否已被返回/切换打断」：进入流程中 mode 是 TRANSITION，
         // 不能拿 mode 判断（直接加载高模时 enterDetail 仍在 await，mode 尚未变为 DETAIL）
         const loadHigh = (allowRetry) => {
-          loader.load(ver(device.model), gltf => {
+          loadGLB(ver(device.model), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
             if (state.enterToken !== enterTokenAtCall) {   // 已返回全景或切换到其它设备 → 丢弃
               const drop = gltf.scene || gltf.scenes[0];
@@ -1073,7 +1160,7 @@
 
         if (thumbUrl) {
           // 移动端：先加载缩略（秒显，LOD0）
-          loader.load(ver(thumbUrl), gltf => {
+          loadGLB(ver(thumbUrl), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
             const obj = gltf.scene || gltf.scenes[0];
             firstLoaded = obj;
