@@ -358,7 +358,7 @@
 
     // 模型资源版本号：仅在模型/缩略图文件内容更新时递增！
     // 页面逻辑改动（UI/性能）不递增 → 已下载的 glb 命中浏览器缓存，避免每次改版都重下几十 MB
-    const MODEL_VER = 37;
+    const MODEL_VER = 38;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + MODEL_VER;
 
     function showFatal(msg) {
@@ -449,16 +449,25 @@
     const rendererLow = makeRenderer(false, 'low-canvas');
     // 顶层：详情高精度模型（透明背景，叠加在底层上方）
     const rendererHigh = makeRenderer(true, 'high-canvas');
-    // WebGL 崩溃防护：context lost 时优雅降载（半分辨率+提示），避免直接崩溃重载
+    // WebGL 崩溃防护：context lost 后 three 无法自动重建场景（大模型内存压力下的崩溃）。
+    // 手机端：自动刷新页面恢复（模型已有 IndexedDB 缓存 → 刷新后秒回，避免黑屏卡死/反复崩）
     [rendererLow, rendererHigh].forEach(r => {
       r.domElement.addEventListener('webglcontextlost', e => {
         e.preventDefault();
-        console.warn('[线上展厅] WebGL context lost，降载恢复');
-        setTimeout(() => {
-          try { r.setPixelRatio(1); r.setSize(innerWidth, innerHeight); } catch (err) {}
-        }, 300);
+        console.warn('[线上展厅] WebGL context lost');
+        try {
+          // 防循环：仅当未 reload 过才自动刷新；已 reload 过则静默降载等待恢复
+          if (!sessionStorage.getItem('ng-reloaded')) {
+            sessionStorage.setItem('ng-reloaded', '1');
+            setTimeout(() => { try { location.reload(); } catch (err) {} }, 200);
+          } else {
+            sessionStorage.removeItem('ng-reloaded');
+          }
+        } catch (err) {}
       });
     });
+    // 进入页面时清除 reload 标记（保证每次全新会话可自动恢复一次）
+    try { sessionStorage.removeItem('ng-reloaded'); } catch (err) {}
 
     // 共享相机 + 控制器（交互绑定顶层画布）
     const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 2000);
