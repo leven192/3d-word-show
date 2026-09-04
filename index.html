@@ -832,6 +832,13 @@
           obj.userData.deviceId = i;
           obj.traverse(o => { if (o.isMesh) o.userData.deviceId = i; });   // 子网格可点击命中
           thumbObjects.push(obj);
+          // 详情模式中加载完成的缩略直接释放（不驻留），返回全景后统一重建
+          if (state.mode === Mode.DETAIL) {
+            disposeObject(obj);
+            thumbObjects.pop();
+            resolve();
+            return;
+          }
           sceneLow.add(obj);
           setEnvIntensity(params.envIntensity);   // 大厅缩略模型也应用 0.1（不刺眼）
           // 隐藏对应立方体实例（矩阵缩放为 0）
@@ -859,6 +866,34 @@
         }
         console.log('[线上展厅] 全部全景缩略加载完成');
       })();
+    }
+
+    // 释放全部全景缩略模型（进入详情时调用）：
+    // 移除出场景 + dispose geometry/material（真正归还 GPU 显存），并恢复占位立方体。
+    // 之前仅 visible=false 不释放内存 → 全景缩略(数百万面)与详情大模型同驻显存导致手机崩溃
+    function releaseThumbnails() {
+      const dummy = new THREE.Object3D();
+      while (thumbObjects.length) {
+        const o = thumbObjects.pop();
+        if (o && o.parent) o.parent.remove(o);
+        disposeObject(o);
+      }
+      // 恢复占位立方体（有缩略的设备原本被 scale≈0 隐藏）
+      for (let i = 0; i < N; i++) {
+        const p = devicePositions[i];
+        dummy.position.set(p.x, 0.55, p.z);
+        dummy.rotation.set(0, -(i / N) * Math.PI * 2 + Math.PI / 2, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        bodyMesh.setMatrixAt(i, dummy.matrix);
+        dummy.position.set(p.x, 0.07, p.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.updateMatrix();
+        baseMesh.setMatrixAt(i, dummy.matrix);
+      }
+      bodyMesh.instanceMatrix.needsUpdate = true;
+      baseMesh.instanceMatrix.needsUpdate = true;
+      console.log('[线上展厅] 全景缩略已释放（进入详情，归还 GPU 内存）');
     }
 
     /* ================= 内存管理：递归释放模型资源 ================= */
@@ -1287,8 +1322,9 @@
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.DETAIL;
       document.body.classList.add('in-detail');   // 隐藏侧栏/分享，面板独占左下角
-      // 详情模式：隐藏全景缩略模型（背景已虚化，无需渲染）→ 大幅降低 GPU/内存峰值防崩溃
-      thumbObjects.forEach(o => { o.visible = false; });
+      // 详情模式：真正释放全景缩略模型（归还 GPU 显存）→ 详情大模型不再与全景数
+      // 百万面同驻显存，杜绝手机 WebGL 内存崩溃（此前仅 visible=false 不释放内存）
+      releaseThumbnails();
       console.log('[线上展厅] 进入详情模式:', device.name);
     }
 
@@ -1322,8 +1358,10 @@
       controls.minDistance = 4;   // 返回全景：恢复全景缩放范围（详情模式由 fitDetailView 设置）
       controls.maxDistance = 80;
       document.body.classList.remove('in-detail');  // 恢复侧栏与分享按钮
-      // 返回全景：恢复显示缩略模型
-      thumbObjects.forEach(o => { o.visible = true; });
+      // 返回全景：从 IndexedDB 缓存快速重建缩略模型（IDB 命中秒回；失败保留立方体占位）
+      if (!thumbObjects.length) {
+        setTimeout(() => { loadThumbsFrom(0); }, 120);
+      }
       console.log('[线上展厅] 返回全景模式');
     }
 
