@@ -1390,16 +1390,16 @@
           });
         };
 
-        // 快路径：仅 PC 借用全景缩略（随后台高清升级，圆柱由高清保证圆滑）；
-        // 手机端不借用——缩略 mesh 少圆柱呈菱形，直接用 mobile 中模（圆柱圆）
-        if (borrowed && PERF.upgradeHigh) {
+        // 快路径：借用全景缩略瞬时显示（秒进，内存零下载），随后台升级高清；
+        // PC/手机均借用——高清 mesh 已 join 轻量化，手机亦可升级（缩略仅短暂过渡）
+        if (borrowed) {
           borrowed.scale.set(1, 1, 1);        // 取消全景缩放(0.85)
           borrowed.position.set(0, 0, 0);     // 归零（fitDetailView 会重新居中取景）
           borrowed.rotation.set(0, 0, 0);
           firstLoaded = borrowed;
           setProgTarget(1);
           finish(borrowed);
-          if (PERF.upgradeHigh) loadHigh(true);   // 后台升级高清（无感替换）
+          loadHigh(true);   // 后台升级高清（无感替换，秒进后细节渐补）
           return;
         }
         // 无借用缩略（全景未加载完就点击）：
