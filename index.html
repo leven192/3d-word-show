@@ -262,15 +262,7 @@
           );
           return;
         }
-        if (isWeChat) {
-          // 微信内且内核可用：直接显示 3D；顶部轻提示（可关闭）引导最佳体验
-          var bar = document.createElement('div');
-          bar.id = 'wx-tip';
-          bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;background:rgba(46,91,255,.93);color:#fff;font:12px "Microsoft YaHei",sans-serif;padding:9px 34px 9px 12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.25);';
-          bar.innerHTML = '如需更流畅体验，可点右上角「···」→「在浏览器中打开」 <span id="wx-tip-close" style="position:absolute;right:10px;top:6px;cursor:pointer;font-size:14px;">✕</span>';
-          var mountBar = function () { document.body.appendChild(bar); document.getElementById('wx-tip-close').addEventListener('click', function () { bar.remove(); }); };
-          if (document.body) mountBar(); else document.addEventListener('DOMContentLoaded', mountBar);
-        }
+        // 微信内且内核可用：直接显示 3D（无顶部提示条，保持画面干净）
       } catch (e) { /* 检测失败不阻塞页面 */ }
     })();
   </script>
@@ -278,7 +270,7 @@
 <body>
   <div id="app"></div>
 
-  <div id="hint">耐锢科技线上展厅 · 点击设备查看详情</div>
+  <div id="hint">点击设备查看详情</div>
 
   <div id="device-panel">
     <div id="brand"><img class="logo-img" src="logo2.png" alt="耐锢科技" /><span class="logo-text">耐锢科技</span></div>
