@@ -762,7 +762,11 @@
           const xhr = new XMLHttpRequest();
           xhr.open('GET', url, true);
           xhr.responseType = 'arraybuffer';
-          xhr.onprogress = e => { if (onProgress && e.lengthComputable) onProgress({ loaded: e.loaded, total: e.total }); };
+          xhr.onprogress = e => {
+            if (!onProgress) return;
+            if (e.lengthComputable && e.total > 0) onProgress({ loaded: e.loaded, total: e.total });
+            else onProgress({ loaded: 0.95, total: 1 });   // 无长度头时给高近似，避免卡 0%
+          };
           xhr.onload = () => {
             if (xhr.status !== 200 && xhr.status !== 0) { if (onError) onError(); return; }
             const ab = xhr.response;
@@ -785,7 +789,7 @@
     const HEAVY_MODELS = [];
     const isHeavyModel = (model) => HEAVY_MODELS.includes(model);
     // 加载单台缩略模型（有模型→显示缩略；失败/无文件→保留立方体占位）
-    function loadOneThumb(d, i) {
+    function loadOneThumb(d, i, onProgress) {
       return new Promise(resolve => {
         // 超大模型全景不加载 3D 缩略（保留立方体占位，防内存崩溃）
         if (isHeavyModel(d.model)) { resolve(); return; }
@@ -827,7 +831,7 @@
           baseMesh.instanceMatrix.needsUpdate = true;
           console.log('[线上展厅] 全景缩略已加载:', d.name, '(' + thumbUrl + ')');
           resolve();
-        }, null, () => { resolve(); });   // 无缩略文件 → 保留立方体占位
+        }, onProgress, () => { resolve(); });   // 无缩略文件 → 保留立方体占位
       });
     }
     // 渐进式加载缩略：从 fromIndex 起串行加载（前几台由首屏先行加载）
@@ -1360,11 +1364,11 @@
         setLoading(true, '构建展厅…', 0.18);
         renderSidebar();
         state.devices.forEach((d, i) => makeLabel(d.name, i));
-        // 首屏：先加载前 2 台轻量缩略（快速出画面），遮罩显示真实进度
+        // 首屏：先加载前 2 台轻量缩略（快速出画面），遮罩显示真实下载百分比
         setLoading(true, '加载展厅模型…', 0.2);
-        await loadOneThumb(state.devices[0], 0);
-        setLoading(true, '加载展厅模型…', 0.55);
-        if (state.devices[1]) await loadOneThumb(state.devices[1], 1);
+        await loadOneThumb(state.devices[0], 0, p => setLoading(true, '加载展厅模型…', 0.2 + p * 0.35));
+        setLoading(true, '加载展厅模型…', 0.6);
+        if (state.devices[1]) await loadOneThumb(state.devices[1], 1, p => setLoading(true, '加载展厅模型…', 0.6 + p * 0.35));
         setLoading(false);
         // 其余 6 台缩略后台逐台渐进加载（不阻塞进入，降低首屏内存峰值防崩溃）
         setTimeout(() => {
