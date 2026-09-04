@@ -349,7 +349,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 11;
+    const ASSET_VER = 12;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -412,6 +412,7 @@
       loadToken: 0,          // 竞态令牌：新加载使旧加载失效
       enterToken: 0,         // 进入流程令牌：返回/切换会使其失效
       exitToken: 0,          // 退出流程令牌
+      userTouched: false,    // 用户是否已手动旋转/缩放详情相机（高模替换后不再强制重置视角）
     };
 
     /* ================= 双层渲染器 ================= */
@@ -445,6 +446,8 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.zoomToCursor = true;   // 滚轮以鼠标位置为定点放大（用户体验优化）
+    // 用户开始手动旋转/缩放 → 标记已交互（高模替换后不再强制重置视角，尊重用户当前视角）
+    controls.addEventListener('start', () => { if (state.mode === Mode.DETAIL) state.userTouched = true; });
 
     /* ================= 全景场景（低模，常驻）—— 赛博朋克视觉 ================= */
 
@@ -673,6 +676,7 @@
           : 'models/thumb/device-01.glb';
         loader.load(ver(thumbUrl), gltf => {
           const obj = gltf.scene || gltf.scenes[0];
+          stripDetachedLogo(obj);   // 移除散落 LOGO 节点（避免拉偏包围盒/缩放/落地）
           const box = new THREE.Box3().setFromObject(obj);
           const size = box.getSize(new THREE.Vector3());
           if (size.x <= 0 || size.y <= 0 || size.z <= 0) return;
@@ -725,6 +729,26 @@
       disposeObject(state.highModel);
       state.highModel = null;
       console.log('[线上展厅] 已卸载高精度模型，内存已释放');
+    }
+
+    // 移除「耐固LOGO」独立节点（部分导出模型的 LOGO 节点 translation 远离主体，
+    // 会拉偏包围盒 → 旋转中心偏移、360° 观察不顺）。保留在主体位置的 LOGO 贴图/文字。
+    function stripDetachedLogo(obj) {
+      if (!obj) return;
+      const toRemove = [];
+      obj.traverse(o => {
+        // 只处理顶层附近的 LOGO 节点（有 Mesh 子级且名字含 LOGO/耐固）
+        if (o.isMesh) return;
+        if (/耐固LOGO|LOGO\.\d|^LOGO$/i.test(o.name || '')) {
+          let hasMesh = false;
+          o.traverse(c => { if (c.isMesh) hasMesh = true; });
+          if (hasMesh) toRemove.push(o);
+        }
+      });
+      toRemove.forEach(n => {
+        if (n.parent) { n.parent.remove(n); disposeObject(n); }
+      });
+      if (toRemove.length) console.log('[线上展厅] 已移除散落 LOGO 节点 ×' + toRemove.length);
     }
 
     /* ================= 相机飞行（平滑缓动） ================= */
@@ -894,6 +918,7 @@
         // 模型就位（处理材质 + 入场景）；任何路径都必须 resolve，避免 Loading 卡死
         const finish = (obj) => {
           if (token !== state.loadToken) { sceneHigh.remove(obj); disposeObject(obj); resolve(null); return; }
+          stripDetachedLogo(obj);   // 移除散落 LOGO 节点（避免拉偏包围盒/旋转中心）
           boostTextures(obj);
           ensureMetalVisible(obj);
           setEnvIntensity(params.envIntensity);
@@ -916,11 +941,21 @@
               return;
             }
             const obj = gltf.scene || gltf.scenes[0];
-            // 替换：卸载缩略 → 显示高模
+            // 替换：卸载缩略 → 显示高模（先记住缩略的居中平移量）
+            const prevPos = firstLoaded ? firstLoaded.position.clone() : null;
             if (firstLoaded) { sceneHigh.remove(firstLoaded); disposeObject(firstLoaded); firstLoaded = null; }
             finish(obj);
             setLoading(false);                          // 保险：确保遮罩关闭
             setStatus('模型已加载（高清）', 'ok');       // 状态栏更新，不遮罩
+            // 高模替换缩略后的取景处理：新 obj 的 position 是默认值，未继承缩略的居中平移，
+            // 否则模型会偏离旋转中心、360° 观察不顺
+            if (state.mode === Mode.DETAIL) {
+              if (state.userTouched && prevPos) {
+                obj.position.copy(prevPos);   // 用户已手动调整视角 → 继承缩略居中平移，避免模型跳动
+              } else {
+                fitDetailView(obj);           // 未交互 → 重新精确取景（模型完整居中）
+              }
+            }
             console.log('[线上展厅] 已升级为高清模型 (LOD1):', device.model);
           }, e => {
             if (e && e.total) {
@@ -971,6 +1006,7 @@
       const token = ++state.enterToken;
       state.mode = Mode.TRANSITION;
       state.selectedIndex = i;
+      state.userTouched = false;   // 重置交互标志（新进入详情时高模就绪会重新取景）
       const device = state.devices[i];
 
       highlightInstance(i);
