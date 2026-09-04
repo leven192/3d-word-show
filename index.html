@@ -789,10 +789,20 @@
           const xhr = new XMLHttpRequest();
           xhr.open('GET', url, true);
           xhr.responseType = 'arraybuffer';
+          let clen = 0, evCount = 0;   // Content-Length / 进度事件计数
+          xhr.onreadystatechange = () => {
+            // 尽早读取响应头 Content-Length（真实总字节）
+            try { if (!clen && xhr.readyState >= 2) { const h = xhr.getResponseHeader('Content-Length'); if (h) clen = parseInt(h, 10) || 0; } } catch (e) {}
+          };
           xhr.onprogress = e => {
             if (!onProgress) return;
-            if (e.lengthComputable && e.total > 0) onProgress({ loaded: e.loaded, total: e.total });
-            else onProgress({ loaded: 0.95, total: 1 });   // 无长度头时给高近似，避免卡 0%
+            if (e.lengthComputable && e.total > 0) { onProgress({ loaded: e.loaded, total: e.total }); return; }
+            // 无长度事件：优先用响应头 Content-Length 计算真实百分比
+            if (clen > 0 && e.loaded > 0) { onProgress({ loaded: Math.min(e.loaded, clen), total: clen }); return; }
+            // 完全无长度信息：按事件数平滑递增（10→25→40→55→70→85→92），绝不恒停一值
+            evCount++;
+            const steps = [0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.92];
+            onProgress({ loaded: steps[Math.min(evCount - 1, steps.length - 1)], total: 1 });
           };
           xhr.onload = () => {
             if (xhr.status !== 200 && xhr.status !== 0) { if (onError) onError(); return; }
