@@ -428,7 +428,7 @@
     const app = document.getElementById('app');
     function makeRenderer(alpha, id) {
       let r;
-      try { r = new THREE.WebGLRenderer({ antialias: PERF.antialias, alpha, powerPreference: 'high-performance' }); }
+      try { r = new THREE.WebGLRenderer({ antialias: PERF.antialias, alpha, powerPreference: 'high-performance', logarithmicDepthBuffer: isMobile }); }
       catch (e1) {
         try { r = new THREE.WebGLRenderer({ antialias: false, alpha }); }
         catch (e2) { showFatal('WebGL 不可用'); throw e2; }
@@ -1103,8 +1103,10 @@
             specular: new THREE.Color(0x666666),
             transparent: m.transparent === true,
             opacity: m.opacity !== undefined ? m.opacity : 1,
-            side: m.side !== undefined ? m.side : THREE.FrontSide,
-            depthWrite: m.depthWrite !== undefined ? m.depthWrite : true
+            // 移动端稳定性：深度始终写入（防止半透明件与实体穿插穿模）；
+            // 双面渲染（防简化/薄壁模型背面丢面现"破洞穿模"感）
+            side: THREE.DoubleSide,
+            depthWrite: true,
           });
           // 贴图保留（map/normalMap 等；none 则纯色）
           if (m.map) { phong.map = m.map; }
@@ -1332,8 +1334,10 @@
         dir.normalize().multiplyScalar(want);
         camera.position.copy(controls.target).add(dir);
       }
-      camera.near = Math.max(0.01, r * 0.001);
-      camera.far = Math.max(100, want * 10);
+      // 深度精度优化：near/far 比从 ~2.5万收紧到 ~2000 内（且 near 恒小于最近缩放距离），
+      // 大幅提升深度缓冲精度，消除大模型(整线)薄件间 Z-fighting 穿模
+      camera.near = Math.max(r * 0.002, want * 0.002);
+      camera.far = want * 3.2;
       camera.updateProjectionMatrix();
       controls.minDistance = r * 0.1;
       controls.maxDistance = r * 20;
