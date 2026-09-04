@@ -794,34 +794,52 @@
         });
       } catch (e) {}
     }
+    // 删除缓存项（缓存损坏时自愈用；失败静默）
+    async function idbDel(key) {
+      try {
+        const db = await openIdb();
+        if (!db) return;
+        await new Promise(res => {
+          try {
+            const tx = db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).delete(key);
+            tx.onsuccess = () => res();
+            tx.onerror = () => res();
+          } catch (e) { res(); }
+        });
+      } catch (e) {}
+    }
 
     /* 缓存优先的 GLB 加载（替代 loader.load）：
      * 1) IndexedDB 命中 → loader.parse() 直接解析（无网络请求）
      * 2) 未命中 → XHR 网络下载（带进度）→ 写入 IndexedDB → parse
      * 3) IndexedDB 读写失败 → 静默降级纯网络加载，不阻断渲染
+     * 4) 缓存数据损坏(parse 失败) → 自动删除坏缓存并重新网络下载（自愈）
      */
-    function loadGLB(url, onLoad, onProgress, onError) {
+    function loadGLB(url, onLoad, onProgress, onError, onFinalError) {
       let done = false;
-      const safeLoad = (buf) => {
+      const safeLoad = (buf, isCache) => {
         if (done) return; done = true;
         // 解析(含 Draco 解码)前进度置 100%：下载/缓存已就绪，避免解码期停留 0% 或中途百分比
         if (onProgress) onProgress({ loaded: 1, total: 1 });
         try { loader.parse(buf, '', onLoad, onError); }
-        catch (e) { if (onError) onError(e); }
-      };
-      (async () => {
-        // 1) 尝试缓存
-        let buf = null;
-        try { buf = await idbGet(url); } catch (e) { buf = null; }
-        if (buf) {
-          if (onProgress) onProgress({ loaded: 1, total: 1 });   // 缓存命中：立即 100%（读取中）
-          safeLoad(buf); return;
+        catch (e) {
+          // 解析失败：若来自缓存 → 删除坏缓存并走网络重下（一次自愈）；否则通知最终失败
+          if (isCache) {
+            done = false;
+            idbDel(url);
+            console.warn('[线上展厅] 缓存模型解析失败，重新网络下载:', url);
+            netLoad();
+          } else if (onFinalError) { onFinalError(e); }
+          else if (onError) onError(e);
         }
+      };
+      const netLoad = () => {
         // 2) 网络下载（XHR 支持进度）
         try {
           const xhr = new XMLHttpRequest();
           xhr.open('GET', url, true);
           xhr.responseType = 'arraybuffer';
+          xhr.timeout = 120000;   // 超时 2 分钟，避免慢网无限挂起
           let clen = 0, evCount = 0;   // Content-Length / 进度事件计数
           xhr.onreadystatechange = () => {
             // 尽早读取响应头 Content-Length（真实总字节）
@@ -838,17 +856,35 @@
             onProgress({ loaded: steps[Math.min(evCount - 1, steps.length - 1)], total: 1 });
           };
           xhr.onload = () => {
-            if (xhr.status !== 200 && xhr.status !== 0) { if (onError) onError(); return; }
+            if (xhr.status !== 200 && xhr.status !== 0) { fail(); return; }
             const ab = xhr.response;
-            if (!ab) { if (onError) onError(); return; }
+            if (!ab) { fail(); return; }
             // 3) 写入缓存（失败忽略，不阻断）
             idbPut(url, ab);
-            safeLoad(ab);
+            safeLoad(ab, false);
           };
-          xhr.onerror = () => { if (onError) onError(); };
-          xhr.ontimeout = () => { if (onError) onError(); };
+          xhr.onerror = () => { fail(); };
+          xhr.ontimeout = () => { fail(); };
+          xhr.onabort = () => { fail(); };
           xhr.send();
-        } catch (e) { if (onError) onError(); }
+        } catch (e) { fail(); }
+      };
+      const fail = () => {
+        if (done) return; done = true;
+        if (onFinalError) onFinalError();
+        else if (onError) onError();
+      };
+      // 1) 尝试缓存（异步入口）
+      (async () => {
+        let buf = null;
+        try { buf = await idbGet(url); } catch (e) { buf = null; }
+        if (done) return;
+        if (buf) {
+          if (onProgress) onProgress({ loaded: 1, total: 1 });   // 缓存命中：立即 100%（读取中）
+          safeLoad(buf, true);
+        } else {
+          netLoad();   // 无缓存 → 网络下载
+        }
       })();
     }
 
@@ -1340,14 +1376,20 @@
             if (allowRetry && token === state.loadToken) {
               // 网络抖动自动重试一次（PC 直载路径，避免"模型显示不出来"）
               setTimeout(() => loadHigh(false), 800);
-            } else if (!firstLoaded) {
-              resolve(null);   // 无缩略可保留 → 结束加载（防 Loading 卡死）
+            } else {
+              if (!firstLoaded) {
+                resolve(null);   // 无缩略可保留 → 结束加载（防 Loading 卡死）
+              } else {
+                // 有低模显示但高清下载失败 → 明确提示，不静默（避免用户干等 5 分钟）
+                setStatus('高清加载失败（网络慢？），当前显示中模', 'err');
+              }
             }
           });
         };
 
-        // 快路径：全景缩略已在内存 → 零下载直接作为 LOD0 显示（瞬时进入详情）
-        if (borrowed) {
+        // 快路径：仅 PC 借用全景缩略（随后台高清升级，圆柱由高清保证圆滑）；
+        // 手机端不借用——缩略 mesh 少圆柱呈菱形，直接用 mobile 中模（圆柱圆）
+        if (borrowed && PERF.upgradeHigh) {
           borrowed.scale.set(1, 1, 1);        // 取消全景缩放(0.85)
           borrowed.position.set(0, 0, 0);     // 归零（fitDetailView 会重新居中取景）
           borrowed.rotation.set(0, 0, 0);
