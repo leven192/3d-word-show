@@ -114,6 +114,20 @@
     body.in-detail #lobby-btn { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
     @media (max-width: 768px) {
       body.in-detail #device-panel { transform: translateY(100%); }
+      /* 手机端：返回大厅移到左上角（右上角让给控制面板） */
+      #lobby-btn { left: 12px; transform: translateX(-12px) translateY(-70px); }
+      #lobby-btn:hover { background: rgba(46,91,255,.92); }
+      #lobby-btn:active { transform: translateX(-12px) translateY(0) scale(.96); }
+      body.in-detail #lobby-btn { transform: translateX(0) translateY(0); }
+      /* 控制面板：竖放在屏幕右侧中部（默认收起为右缘细标题条，不遮挡模型与返回按钮） */
+      .lil-gui.autoPlace {
+        top: 50%; right: 8px; left: auto !important;
+        transform: translateY(-50%);
+        max-height: 84vh; width: 230px;
+        border-radius: 10px;
+        font-size: 12px;
+      }
+      .lil-gui.root.closed > .children { display: none; }
     }
 
     /* ========== 设备列表（桌面左侧栏 / 手机底部横条） ========== */
@@ -350,7 +364,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 18;
+    const ASSET_VER = 19;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -1228,7 +1242,8 @@
       }
     };
     const gui = new GUI({ title: '控制面板' });
-    gui.open();   // 控制面板默认展开（不收起）
+    // 桌面默认展开；手机（窄屏）默认收起为右缘细标题条，点开才显示内容（避免遮挡模型/返回按钮）
+    if (innerWidth <= 768) gui.close(); else gui.open();
     const vf = gui.addFolder('视图');
     vf.add(params, 'resetView').name('重置视角');
     vf.add(params, 'autoRotate').name('自动旋转').onChange(v => { controls.autoRotate = v; });
