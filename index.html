@@ -358,7 +358,7 @@
 
     // 模型资源版本号：仅在模型/缩略图文件内容更新时递增！
     // 页面逻辑改动（UI/性能）不递增 → 已下载的 glb 命中浏览器缓存，避免每次改版都重下几十 MB
-    const MODEL_VER = 34;
+    const MODEL_VER = 35;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + MODEL_VER;
 
     function showFatal(msg) {
@@ -1086,14 +1086,14 @@
       const enterTokenAtCall = state.enterToken;   // 捕获进入令牌：返回/切换会递增它 → 高模就绪后丢弃
       return new Promise(resolve => {
         // 分级加载：
-        //  PC（PERF.upgradeHigh=true）：直接加载高模（跳过低质缩略 → 圆柱圆、零件完整、细节全保留）
-        //  移动端（upgradeHigh=false）：只用轻量缩略（稳定不崩）
-        // 移动端缩略路径：models/device-XX.glb → models/thumb/device-XX.glb；d1(model.glb) → device-01.glb
+        //  PC（PERF.upgradeHigh=true）：直接加载精细高模（圆柱圆、零件完整、细节全保留）
+        //  移动端（upgradeHigh=false）：加载「移动端中模」(device-XX-mobile.glb / model-mobile.glb)——
+        //  保留更多细节（圆柱圆、不穿模）且 mesh 已 join 轻量化（稳定不崩）
         const thumbUrl = PERF.upgradeHigh ? null
           : device.model.startsWith('models/')
-            ? device.model.replace('models/', 'models/thumb/')
-            : 'models/thumb/device-01.glb';
-        let firstLoaded = null;   // 第一段显示的模型（缩略/LOD0，仅移动端使用）
+            ? device.model.replace('models/device-', 'models/device-').replace(/\.glb$/, '-mobile.glb')
+            : 'model-mobile.glb';
+        let firstLoaded = null;   // 第一段显示的模型（移动端中模，仅移动端使用）
 
         // 模型就位（处理材质 + 入场景）；任何路径都必须 resolve，避免 Loading 卡死
         const finish = (obj) => {
