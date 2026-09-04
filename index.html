@@ -356,7 +356,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 27;
+    const ASSET_VER = 28;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -524,7 +524,7 @@
     }
 
     // ---------- ④ 设备低模（直接落在大理石地面） ----------
-    const N = 10;                 // 设备数量
+    const N = 8;                  // 设备数量（展厅固定 8 台）
     const R = 5.0;                // 设备环绕半径
     let bodyMesh, baseMesh, labels, defaultColors, devicePositions;
     const palette = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa29bfe, 0xff8a5c, 0x55efc4, 0xff6b8a, 0x74b9ff, 0xfd79a8, 0x00cec9];
