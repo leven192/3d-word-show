@@ -973,11 +973,11 @@
      * 真实下载进度作为「目标值」驱动，显示值缓动爬升 → 无论缓存命中还是瞬时下载，
      * 百分比都平滑从 0 走到 100，不会 0→100 跳变，也不会卡 0%。
      */
-    let progCur = 0, progTarget = 0, progRAF = 0, progText = '加载中…';
+    let progCur = 0, progTarget = 0, progRAF = 0, progText = '加载中…', progStartAt = 0;
     function setProgText(t) { progText = t; }
     function setProgTarget(t) {
       progTarget = Math.max(progTarget, Math.min(1, t));   // 只增不减
-      if (!progRAF) progRAF = requestAnimationFrame(progStep);
+      if (!progRAF) { progStartAt = performance.now(); progRAF = requestAnimationFrame(progStep); }
     }
     function progStep() {
       progCur += (progTarget - progCur) * 0.1 + 0.004;     // 缓动 + 恒定最小增量
@@ -990,12 +990,15 @@
       if (progCur < 1) progRAF = requestAnimationFrame(progStep);
       else { progRAF = 0; }
     }
-    // 等待进度动画到达 100%（成功路径用；上限 1.6s 兜底防卡）
+    // 等待进度动画到达 100%（成功路径用）。
+    // 保证最小展示时长：即使缓存/瞬时加载，百分比也要平滑 0→100 可见（最快 ~700ms），
+    // 上限 2.5s 兜底防卡
     function waitProgDone() {
       return new Promise(res => {
         const t0 = performance.now();
         (function ck() {
-          if (progCur >= 0.999 || performance.now() - t0 > 1600) res();
+          const minShown = (performance.now() - progStartAt) >= 700;   // 至少展示 700ms
+          if ((progCur >= 0.999 && minShown) || performance.now() - t0 > 2500) res();
           else requestAnimationFrame(ck);
         })();
       });
