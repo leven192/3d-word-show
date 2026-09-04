@@ -976,11 +976,13 @@
     let progCur = 0, progTarget = 0, progRAF = 0, progText = '加载中…', progStartAt = 0;
     function setProgText(t) { progText = t; }
     function setProgTarget(t) {
-      progTarget = Math.max(progTarget, Math.min(1, t));   // 只增不减
+      progTarget = Math.min(1, t);   // 真实进度直接赋值（允许更新/回退，不用 max 挡真实值）
       if (!progRAF) { progStartAt = performance.now(); progRAF = requestAnimationFrame(progStep); }
     }
     function progStep() {
-      progCur += (progTarget - progCur) * 0.1 + 0.004;     // 缓动 + 恒定最小增量
+      // 快速跟踪真实目标（0.4/帧），保证显示百分比≈真实下载进度
+      progCur += (progTarget - progCur) * 0.4;
+      if (progTarget - progCur < 0.001) progCur = progTarget;   // 到位即锁定
       if (progCur >= 1) progCur = 1;
       overlay.classList.remove('hidden', 'error');
       loadingText.textContent = progText;
@@ -1247,18 +1249,13 @@
       // 若之前详情模式有模型 → 先卸载（切换到另一台设备时）
       unloadHighModel();
 
-      // 平滑进度动画启动（0 起步自动爬升；下载/缓存的真实进度更新目标值；
-      // 模型就绪后目标=1 → 进度平滑走到 100% 才关闭遮罩 → 百分比始终正确显示）
+      // 平滑进度：完全由真实下载进度驱动（loaded/total 直接赋值，可随时更新）；
+      // 就绪置 100 → 平滑走完才关遮罩。无任何"模拟/兜底"虚报值（避免百分比与真实不符）
       stopProgressAnim();          // 终止上一轮动画（防残留）
       progCur = 0; progTarget = 0; // 每次进入从 0 开始
       setProgText('加载 ' + device.name + '…');
       setLoading(true, '飞入特写 · 加载 ' + device.name + '…', 0);
-      setProgTarget(0.04);   // 起步目标，防卡 0%
-      // 时间兜底：真实下载进度事件到达前，百分比按时间自动缓升（避免早期一直停 4%）。
-      // 真实进度(setProgTarget)取较大值自动接管；就绪置 100。
-      const boostTimers = [280, 560, 850, 1150, 1500, 2000].forEach((ms, idx) => {
-        setTimeout(() => { if (progCur < 0.9) setProgTarget([0.12, 0.25, 0.4, 0.55, 0.7, 0.85][idx]); }, ms);
-      });
+      setProgTarget(0.04);   // 起步目标，防卡 0%（真实进度到达后立即覆盖）
       const view = detailView(i);
       const flyP = flyTo(view.pos, view.tgt, 900);
       const loadP = loadHighModel(device);
