@@ -217,6 +217,21 @@
     #loading-overlay.error .spinner { border-top-color: #ff6b6b; }
     #loading-overlay.error #loading-text { color: #ff6b6b; }
 
+    /* ========== 详情内高模加载进度条（顶部细条，不遮模型画面） ========== */
+    #hi-progress {
+      position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+      z-index: 25; width: min(300px, 70vw);
+      background: rgba(16,20,30,.82); border: 1px solid rgba(255,255,255,.14);
+      border-radius: 20px; padding: 6px 14px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.35);
+      transition: opacity .3s;
+    }
+    #hi-progress.hidden { opacity: 0; pointer-events: none; }
+    #hi-bar { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; }
+    #hi-bar::after { content: ''; display: block; height: 100%; width: var(--w, 0%); background: linear-gradient(90deg,#4da3ff,#7c6bff); transition: width .15s; }
+    #hi-pct { color: #9fc6ff; font-size: 12px; font-weight: 700; min-width: 34px; text-align: right; }
+
     .lg { z-index: 5 !important; }
   </style>
   <!-- 兼容性检测（所有浏览器都会执行，早于 module 脚本）：
@@ -292,6 +307,12 @@
 
   <button id="lobby-btn" title="返回大厅">⌂ 返回大厅</button>
 
+  <!-- 详情内高模加载进度条（顶部细条，不遮画面；后台下载/升级高清时显示） -->
+  <div id="hi-progress" class="hidden">
+    <div id="hi-bar"></div>
+    <span id="hi-pct">0%</span>
+  </div>
+
   <div id="loading-overlay">
     <div class="spinner"></div>
     <div id="loading-text">初始化中…</div>
@@ -334,6 +355,17 @@
     const loadingText = document.getElementById('loading-text');
     const progressBar = document.getElementById('progress-bar');
     const progressPct = document.getElementById('progress-pct');
+    const hiProgress = document.getElementById('hi-progress');
+    const hiBar = document.getElementById('hi-bar');
+    const hiPct = document.getElementById('hi-pct');
+    // 详情内高模加载进度条（顶部细条）：pct 0-100，null 隐藏
+    function showHiProgress(pct) {
+      if (pct == null) { hiProgress.classList.add('hidden'); return; }
+      hiProgress.classList.remove('hidden');
+      const p = Math.max(0, Math.min(100, Math.round(pct * 100)));
+      hiBar.style.setProperty('--w', p + '%');
+      hiPct.textContent = p + '%';
+    }
 
     /* ============ PC / 移动端性能分级（全局） ============
      * isMobile：UA 或屏幕宽度 <768px 判定
@@ -1281,6 +1313,7 @@
             const prevPos = firstLoaded ? firstLoaded.position.clone() : null;
             if (firstLoaded) { sceneHigh.remove(firstLoaded); disposeObject(firstLoaded); firstLoaded = null; }
             finish(obj);   // LOD0 已 resolve 进入详情，此路径仅后台替换，不再操作遮罩/进度
+            showHiProgress(null);   // 高清就绪：隐藏顶部进度条
             setStatus('模型已加载（高清）', 'ok');       // 状态栏更新，不遮罩
             // 高模替换中模后的取景处理：新 obj 的 position 是默认值，未继承中模的居中平移，
             // 否则模型会偏离旋转中心、360° 观察不顺
@@ -1293,13 +1326,15 @@
             }
             console.log('[线上展厅] 已升级为高清模型 (LOD1):', device.model);
           }, e => {
-            // 面板状态显示真实下载百分比（画面已进入，无全屏遮罩）
+            // 面板状态 + 顶部细进度条显示真实下载百分比（画面已进入，无全屏遮罩）
             if (e && e.total && state.mode === Mode.DETAIL && token === state.loadToken) {
               const pct = Math.round(e.loaded / e.total * 100);
               setStatus('加载 ' + device.name + '… ' + pct + '%', 'loading');
+              showHiProgress(e.loaded / e.total);
             }
           }, () => {
             state.upgrading = false;
+            showHiProgress(null);
             console.warn('[线上展厅] 高清模型失败' + (allowRetry ? '，重试一次' : ''));
             // 遮罩由 enterDetail 统一关闭，这里不操作
             if (allowRetry && token === state.loadToken) {
@@ -1412,6 +1447,7 @@
       state.mode = Mode.TRANSITION;
 
       state.upgrading = false;   // 停止升级标记
+      showHiProgress(null);      // 隐藏详情高模进度条
       stopProgressAnim();   // 停止详情进度动画
       setLoading(true, '返回全景…');
       rendererHigh.domElement.style.cursor = 'wait';
