@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D 设备展示</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #1b1e26;
+      touch-action: none;
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+
+    /* ========== 设备列表（桌面：左侧栏；手机：底部横条） ========== */
+    #device-panel {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 10;
+      width: 230px;
+      background: rgba(16, 19, 26, .82);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid rgba(255,255,255,.08);
+      display: flex; flex-direction: column;
+    }
+    #device-panel h3 {
+      color: #d5d9e2; font-size: 15px; font-weight: 600;
+      padding: 14px 14px 10px;
+    }
+    #device-list { flex: 1; overflow-y: auto; padding: 0 10px 14px; }
+    .device-tile {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: background .2s, border-color .2s, transform .15s;
+    }
+    .device-tile:hover { background: rgba(255,255,255,.09); }
+    .device-tile.active { border-color: #3d6cff; background: rgba(61,108,255,.14); }
+    .device-tile:active { transform: scale(.97); }
+    .device-tile .thumb {
+      height: 72px; border-radius: 6px; overflow: hidden; margin-bottom: 8px;
+      background: #232833; display: flex; align-items: center; justify-content: center;
+    }
+    .device-tile .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .device-tile .thumb .ph { color: #4da3ff; font-size: 26px; font-weight: 700; opacity: .7; }
+    .device-tile .dname { color: #e8eaf0; font-size: 13px; font-weight: 600; }
+    .device-tile .ddesc {
+      color: rgba(232,234,240,.5); font-size: 11px; margin-top: 3px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .device-tile.error .dname { color: #ff6b6b; }
+
+    @media (max-width: 768px) {
+      #device-panel {
+        top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: 104px;
+        border-right: none; border-top: 1px solid rgba(255,255,255,.08);
+      }
+      #device-panel h3 { display: none; }
+      #device-list { display: flex; gap: 8px; padding: 8px 10px; overflow-x: auto; overflow-y: hidden; }
+      .device-tile { flex: 0 0 86px; margin-bottom: 0; padding: 6px; }
+      .device-tile .thumb { height: 52px; margin-bottom: 5px; }
+      .device-tile .dname { font-size: 11px; text-align: center; }
+      .device-tile .ddesc { display: none; }
+    }
+
+    /* ========== 加载遮罩（进度条；不透明，切换时避免闪烁） ========== */
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 20;
+      background: #1b1e26;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      transition: opacity .35s;
+    }
+    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 4px solid rgba(255,255,255,.15);
+      border-top-color: #4da3ff;
+      animation: spin .9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-text { color: #e8eaf0; font-size: 14px; }
+    .progress-wrap { width: 240px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+    #progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #4da3ff, #7c6bff); transition: width .2s; }
+    #loading-overlay.error .spinner { border-top-color: #ff6b6b; }
+    #loading-overlay.error #loading-text { color: #ff6b6b; }
+
+    /* ========== 顶部信息 ========== */
+    #topbar {
+      position: fixed; top: 14px; left: 244px; right: 14px; z-index: 8;
+      display: flex; align-items: center; gap: 10px; pointer-events: none;
+    }
+    #device-name { color: #e8eaf0; font-size: 17px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+    #device-desc { color: rgba(232,234,240,.6); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @media (max-width: 768px) {
+      #topbar { left: 12px; right: 12px; bottom: 120px; top: auto; flex-direction: column; align-items: flex-start; gap: 2px; }
+    }
+
+    #share-btn {
+      position: fixed; right: 14px; top: 14px; z-index: 15; pointer-events: auto;
+      background: #2b303b; color: #e8eaf0; border: 1px solid rgba(255,255,255,.12);
+      border-radius: 18px; padding: 7px 14px; cursor: pointer; font-size: 12px;
+    }
+    #share-btn:hover { background: #3a4150; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="device-panel">
+    <h3>设备列表</h3>
+    <div id="device-list"></div>
+  </div>
+
+  <div id="topbar">
+    <div id="device-name">—</div>
+    <div id="device-desc"></div>
+  </div>
+
+  <button id="share-btn">复制链接</button>
+
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">加载中…</div>
+    <div class="progress-wrap"><div id="progress-bar"></div></div>
+  </div>
+
+  <!-- 备用 CDN（本地 lib/ 不可用时自动切换） -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script>
+    window.__CDNS = [
+      { name: 'unpkg',     three: 'https://unpkg.com/three@0.160.0/build/three.module.js',          addons: 'https://unpkg.com/three@0.160.0/examples/jsm/', gui: 'https://unpkg.com/lil-gui@0.20.0/dist/lil-gui.esm.min.js' },
+      { name: 'jsdelivr',  three: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js', addons: 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/', gui: 'https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.esm.min.js' },
+      { name: 'npmmirror', three: 'https://registry.npmmirror.com/three/0.160.0/files/build/three.module.js', addons: 'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/', gui: 'https://registry.npmmirror.com/lil-gui/0.20.0/files/dist/lil-gui.esm.min.js' }
+    ];
+    function __injectImportMap(cdn) {
+      var s = document.createElement('script');
+      s.type = 'importmap';
+      s.textContent = JSON.stringify({ imports: { 'three': cdn.three, 'three/addons/': cdn.addons } });
+      document.head.appendChild(s);
+    }
+  </script>
+
+  <script type="module">
+    const overlay = document.getElementById('loading-overlay');
+    const loadingText = document.getElementById('loading-text');
+    const progressBar = document.getElementById('progress-bar');
+
+    function showFatal(msg) {
+      overlay.classList.remove('hidden');
+      overlay.classList.add('error');
+      loadingText.textContent = '加载失败：' + msg;
+      progressBar.style.width = '100%';
+    }
+
+    // ---------- 加载 three.js（本地优先，CDN 回退） ----------
+    let THREE, OrbitControls, GLTFLoader, GUI;
+    try {
+      THREE = await import('./lib/three.module.js');
+      OrbitControls = (await import('./lib/OrbitControls.js')).OrbitControls;
+      GLTFLoader = (await import('./lib/GLTFLoader.js')).GLTFLoader;
+      GUI = (await import('./lib/lil-gui.esm.min.js')).default;
+      console.log('[设备展示] 使用本地依赖');
+    } catch (e) {
+      console.warn('[设备展示] 本地依赖不可用，尝试 CDN', e);
+      let ok = false;
+      for (const cdn of window.__CDNS) {
+        try {
+          __injectImportMap(cdn);
+          THREE = await import('three');
+          OrbitControls = (await import('three/addons/controls/OrbitControls.js')).OrbitControls;
+          GLTFLoader = (await import('three/addons/loaders/GLTFLoader.js')).GLTFLoader;
+          GUI = (await import(cdn.gui)).default;
+          console.log('[设备展示] 使用 CDN:', cdn.name);
+          ok = true;
+          break;
+        } catch (e2) { console.warn('CDN 失败', cdn.name, e2); }
+      }
+      if (!ok) { showFatal('3D 引擎加载失败，请检查网络后刷新'); throw new Error('no engine'); }
+    }
+
+    // ---------- 场景 ----------
+    const app = document.getElementById('app');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1b1e26);
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 2000);
+    camera.position.set(3, 2, 5);
+
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (e1) {
+      try { renderer = new THREE.WebGLRenderer({ antialias: false }); }
+      catch (e2) { showFatal('WebGL 不可用'); throw e2; }
+    }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    app.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+
+    // 灯光
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
+    const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(5, 8, 4); scene.add(key);
+    const fill = new THREE.DirectionalLight(0x8899ff, 0.6); fill.position.set(-5, 2, -4); scene.add(fill);
+
+    // ---------- 模型帧适配（自动居中 + 适配屏幕） ----------
+    function frameModel(obj) {
+      const box = new THREE.Box3().setFromObject(obj);
+      if (box.isEmpty()) return;
+      const sphere = box.getBoundingSphere(new THREE.Sphere());
+      const dist = Math.max(sphere.radius / Math.tan((camera.fov * Math.PI) / 360) * 1.2, sphere.radius * 2);
+      camera.near = Math.max(0.01, sphere.radius * 0.001);
+      camera.far = Math.max(100, dist * 10);
+      camera.updateProjectionMatrix();
+      const dir = new THREE.Vector3(1, 0.6, 0.9).normalize();
+      camera.position.copy(sphere.center).addScaledVector(dir, dist);
+      controls.target.copy(sphere.center);
+      controls.minDistance = sphere.radius * 0.1;
+      controls.maxDistance = sphere.radius * 20;
+      controls.update();
+    }
+
+    // ---------- 内存管理：销毁模型（几何体/材质/贴图） ----------
+    function disposeModel() {
+      if (!currentModel) return;
+      scene.remove(currentModel);
+      currentModel.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) {
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach(m => {
+            if (!m) return;
+            // 释放贴图
+            for (const k in m) {
+              if (m[k] && m[k].isTexture) m[k].dispose();
+            }
+            m.dispose();
+          });
+        }
+      });
+      currentModel = null;
+    }
+
+    // ---------- 设备状态 ----------
+    const loader = new GLTFLoader();
+    let devices = [];
+    let currentDevice = null;
+    let currentModel = null;
+    let loading = false;
+    let activeTile = null;
+
+    function setLoading(show, text, pct) {
+      if (show) {
+        overlay.classList.remove('hidden', 'error');
+        loadingText.textContent = text || '加载中…';
+        progressBar.style.width = (pct === undefined ? 0 : Math.round(pct * 100)) + '%';
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    function applyWireframe(on) {
+      if (!currentModel) return;
+      currentModel.traverse(o => {
+        if (o.isMesh && o.material) {
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          mats.forEach(m => { if (m) { m.wireframe = on; m.needsUpdate = true; } });
+        }
+      });
+    }
+
+    // ---------- 切换过渡动画（遮罩淡出 + 模型入场，避免闪烁） ----------
+    function transitionIn() {
+      // 模型轻微放大入场
+      if (currentModel) {
+        currentModel.scale.setScalar(0.93);
+        const t0 = performance.now();
+        (function anim(now) {
+          const k = Math.min(1, (now - t0) / 350);
+          const ease = 1 - Math.pow(1 - k, 3);
+          if (currentModel) currentModel.scale.setScalar(0.93 + 0.07 * ease);
+          if (k < 1) requestAnimationFrame(anim);
+        })(t0);
+      }
+      // 遮罩淡出（此时新旧模型已在遮罩后完成切换 → 无闪烁）
+      overlay.classList.add('hidden');
+    }
+
+    // ---------- 按需加载设备模型（带进度条） ----------
+    async function loadDevice(device, tile) {
+      if (loading || (currentDevice && currentDevice.id === device.id)) return;
+      loading = true;
+      if (tile) { if (activeTile) activeTile.classList.remove('active'); activeTile = tile; tile.classList.add('active'); }
+      document.getElementById('device-name').textContent = device.name;
+      document.getElementById('device-desc').textContent = device.desc || '';
+      setLoading(true, '加载 ' + device.name + '…', 0);
+      try {
+        const gltf = await new Promise((resolve, reject) => {
+          loader.load(device.model, resolve, e => {
+            if (e && e.total) setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
+          }, reject);
+        });
+        const obj = gltf.scene || gltf.scenes[0];
+        // 内存管理：销毁上一台设备的模型
+        disposeModel();
+        scene.add(obj);
+        frameModel(obj);
+        currentModel = obj;
+        currentDevice = device;
+        if (tile) tile.classList.remove('error');
+        applyWireframe(params.wireframe);
+        transitionIn();
+      } catch (err) {
+        console.error('模型加载失败:', device.model, err);
+        setLoading(true, '「' + device.name + '」模型加载失败：' + device.model, 1);
+        if (tile) { tile.classList.add('error'); tile.classList.remove('active'); activeTile = null; }
+        // 3 秒后恢复（保留上一台模型，不遮黑屏）
+        setTimeout(() => { if (loading === false) overlay.classList.add('hidden'); }, 3000);
+      } finally {
+        loading = false;
+      }
+    }
+
+    // ---------- 设备列表 ----------
+    function esc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function renderDeviceList() {
+      const list = document.getElementById('device-list');
+      list.innerHTML = '';
+      devices.forEach((d, i) => {
+        const tile = document.createElement('div');
+        tile.className = 'device-tile' + (i === 0 ? ' active' : '');
+        const thumb = d.thumbnail
+          ? '<img src="' + esc(d.thumbnail) + '" alt="" onerror="this.parentNode.innerHTML=\'<span class=ph>' + (i + 1) + '</span>\'">'
+          : '<span class="ph">' + (i + 1) + '</span>';
+        tile.innerHTML = '<div class="thumb">' + thumb + '</div>' +
+          '<div class="dname">' + esc(d.name) + '</div>' +
+          (d.desc ? '<div class="ddesc">' + esc(d.desc) + '</div>' : '');
+        tile.addEventListener('click', () => loadDevice(d, tile));
+        list.appendChild(tile);
+      });
+    }
+
+    async function initDevices() {
+      try {
+        const r = await fetch('./models.json', { cache: 'no-store' });
+        const data = await r.json();
+        devices = data.devices || [];
+        if (!devices.length) { showFatal('models.json 中没有设备'); return; }
+        renderDeviceList();
+        // 自动加载第一台
+        loadDevice(devices[0], document.querySelector('.device-tile'));
+      } catch (e) {
+        console.error(e);
+        showFatal('models.json 加载失败：' + e.message);
+      }
+    }
+
+    // ---------- lil-gui 控制面板 ----------
+    const params = {
+      autoRotate: false, autoRotateSpeed: 2,
+      wireframe: false,
+      background: '#1b1e26', exposure: 1.1,
+      resetView: () => frameModel(currentModel)
+    };
+    const gui = new GUI({ title: '控制面板' });
+    const vf = gui.addFolder('视图');
+    vf.add(params, 'resetView').name('重置视角');
+    vf.add(params, 'autoRotate').name('自动旋转').onChange(v => { controls.autoRotate = v; });
+    vf.add(params, 'autoRotateSpeed', 0, 10, 0.1).name('旋转速度').onChange(v => { controls.autoRotateSpeed = v; });
+    const mf = gui.addFolder('模型');
+    mf.add(params, 'wireframe').name('线框').onChange(applyWireframe);
+    const rf = gui.addFolder('渲染');
+    rf.addColor(params, 'background').name('背景色').onChange(v => { scene.background = new THREE.Color(v); });
+    rf.add(params, 'exposure', 0.2, 3, 0.01).name('曝光').onChange(v => { renderer.toneMappingExposure = v; });
+    vf.open(); mf.open(); rf.open();
+
+    // ---------- 渲染循环 / 窗口适配 / 分享 ----------
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    document.getElementById('share-btn').addEventListener('click', () => {
+      const url = location.href;
+      const done = () => { const b = document.getElementById('share-btn'); b.textContent = '✓ 已复制'; setTimeout(() => b.textContent = '复制链接', 1500); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done);
+      else { const ta = document.createElement('textarea'); ta.value = url; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+    });
+
+    // 启动
+    initDevices();
+  </script>
+</body>
+</html>

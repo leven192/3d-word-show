@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Device-03 3D 展示（HDRI 金属材质）</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #0a0a0a;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+
+    /* 操作提示（左上角） */
+    #hint {
+      position: fixed; top: 14px; left: 14px; z-index: 10;
+      color: rgba(255,255,255,.75); font-size: 12px;
+      background: rgba(0,0,0,.45); padding: 8px 14px; border-radius: 8px;
+      line-height: 1.7; pointer-events: none;
+      user-select: none;
+    }
+
+    /* 加载覆盖层：进度条 + 百分比 */
+    #progress {
+      position: fixed; inset: 0; z-index: 20;
+      background: #101014;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 18px;
+      transition: opacity .5s;
+    }
+    #progress.hidden { opacity: 0; pointer-events: none; }
+    #progress-text { color: #e8eaf0; font-size: 15px; letter-spacing: 1px; }
+    .bar { width: 300px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+    #bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #4da3ff, #7c6bff); transition: width .2s; }
+    #progress.error #progress-text { color: #ff6b6b; }
+
+    /* 左侧信息卡片 */
+    #info-card {
+      position: fixed; left: 14px; top: 120px; z-index: 10;
+      width: 200px; background: rgba(16,20,30,.82); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,.12); border-radius: 12px;
+      padding: 14px; color: #e8ecf4; pointer-events: none; user-select: none;
+    }
+    #info-card .ic-name { font-size: 16px; font-weight: 700; }
+    #info-card .ic-desc { font-size: 11px; color: rgba(232,236,244,.55); margin: 4px 0 10px; }
+    #info-card #ic-stats { font-size: 11.5px; color: #9fc6ff; line-height: 1.8; }
+
+    /* 右侧控制面板 */
+    #control-panel {
+      position: fixed; right: 14px; top: 14px; z-index: 10;
+      width: 190px; background: rgba(16,20,30,.82); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,.12); border-radius: 12px;
+      padding: 12px 14px; color: #e8ecf4; font-size: 12.5px;
+      user-select: none;
+    }
+    #control-panel .cp-title { font-weight: 700; font-size: 13px; margin-bottom: 10px; }
+    #control-panel .cp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+    #control-panel label { color: rgba(232,236,244,.85); flex: none; }
+    #control-panel input[type="range"] { flex: 1; min-width: 0; accent-color: #4da3ff; }
+    #control-panel #cp-exposure-v { color: #9fc6ff; width: 30px; text-align: right; }
+    #control-panel input[type="checkbox"] { accent-color: #4da3ff; }
+    #control-panel #cp-reset {
+      width: 100%; padding: 6px; border: none; border-radius: 7px; cursor: pointer;
+      background: #3d6cff; color: #fff; font-size: 12.5px;
+    }
+    #control-panel #cp-reset:hover { background: #2f58d6; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="hint">
+    左键拖动：旋转<br />
+    右键拖动：平移<br />
+    滚轮：缩放<br />
+    停止操作：自动缓慢旋转
+  </div>
+
+  <!-- 左侧信息卡片 -->
+  <div id="info-card">
+    <div class="ic-name">Device-03</div>
+    <div class="ic-desc">3D 工业设备 · HDRI 环境渲染</div>
+    <div id="ic-stats">模型加载中…</div>
+  </div>
+
+  <!-- 右侧控制面板 -->
+  <div id="control-panel">
+    <div class="cp-title">控制面板</div>
+    <div class="cp-row">
+      <label for="cp-exposure">曝光</label>
+      <input type="range" id="cp-exposure" min="0.3" max="3" step="0.05" value="1.0" />
+      <span id="cp-exposure-v">1.0</span>
+    </div>
+    <div class="cp-row"><label><input type="checkbox" id="cp-rotate" checked /> 自动旋转</label></div>
+    <div class="cp-row"><label><input type="checkbox" id="cp-bg" checked /> HDRI 背景</label></div>
+    <div class="cp-row"><button id="cp-reset">重置视角</button></div>
+  </div>
+
+  <div id="progress">
+    <div id="progress-text">Loading 0%</div>
+    <div class="bar"><div id="bar-fill"></div></div>
+  </div>
+
+  <!-- 备用 CDN（本地 lib/ 不可用时自动切换） -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script>
+    window.__CDNS = [
+      { name: 'unpkg',     three: 'https://unpkg.com/three@0.160.0/build/three.module.js',          addons: 'https://unpkg.com/three@0.160.0/examples/jsm/' },
+      { name: 'jsdelivr',  three: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js', addons: 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/' },
+      { name: 'npmmirror', three: 'https://registry.npmmirror.com/three/0.160.0/files/build/three.module.js', addons: 'https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/' }
+    ];
+    function __injectImportMap(cdn) {
+      var s = document.createElement('script');
+      s.type = 'importmap';
+      s.textContent = JSON.stringify({ imports: { 'three': cdn.three, 'three/addons/': cdn.addons } });
+      document.head.appendChild(s);
+    }
+  </script>
+
+  <script type="module">
+    /* ============================================================
+     *  Device-03 金属材质展示页
+     *  关键：RGBELoader 加载 HDRI 环境贴图 → scene.environment
+     *        金属材质反射环境光，解决"全黑/深灰"问题
+     * ============================================================ */
+    const progressEl = document.getElementById('progress');
+    const textEl = document.getElementById('progress-text');
+    const barEl = document.getElementById('bar-fill');
+
+    function setProgress(pct, label) {
+      barEl.style.width = Math.max(0, Math.min(100, Math.round(pct))) + '%';
+      textEl.textContent = label + ' ' + Math.round(pct) + '%';
+    }
+    function showError(msg) {
+      progressEl.classList.add('error');
+      textEl.textContent = msg;
+    }
+
+    // ---------- 加载 three.js（本地优先，CDN 回退） ----------
+    let THREE, OrbitControls, GLTFLoader, RGBELoader, RoomEnvironment;
+    try {
+      THREE = await import('./lib/three.module.js');
+      OrbitControls = (await import('./lib/OrbitControls.js')).OrbitControls;
+      GLTFLoader = (await import('./lib/GLTFLoader.js')).GLTFLoader;
+      RGBELoader = (await import('./lib/RGBELoader.js')).RGBELoader;
+      RoomEnvironment = (await import('./lib/environments/RoomEnvironment.js')).RoomEnvironment;
+      console.log('[Device03] 使用本地依赖');
+    } catch (e) {
+      console.warn('[Device03] 本地依赖不可用，尝试 CDN', e);
+      let ok = false;
+      for (const cdn of window.__CDNS) {
+        try {
+          __injectImportMap(cdn);
+          THREE = await import('three');
+          OrbitControls = (await import('three/addons/controls/OrbitControls.js')).OrbitControls;
+          GLTFLoader = (await import('three/addons/loaders/GLTFLoader.js')).GLTFLoader;
+          RGBELoader = (await import('three/addons/loaders/RGBELoader.js')).RGBELoader;
+          RoomEnvironment = (await import('three/addons/environments/RoomEnvironment.js')).RoomEnvironment;
+          console.log('[Device03] 使用 CDN:', cdn.name);
+          ok = true;
+          break;
+        } catch (e2) { console.warn('CDN 失败', cdn.name, e2); }
+      }
+      if (!ok) { showError('3D 引擎加载失败，请检查网络后刷新'); throw new Error('no engine'); }
+    }
+
+    /* ================= 渲染器（物理正确光照） ================= */
+    const app = document.getElementById('app');
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;   // 电影级色调映射，金属质感更真实
+    renderer.toneMappingExposure = 1.0;
+    renderer.useLegacyLights = false;   // 物理正确光照（对应旧版 physicallyCorrectLights=true；r160 已默认）
+    app.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 2000);
+    camera.position.set(200, 150, 350);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.autoRotate = true;          // 自动旋转：用户不操作时缓慢自转
+    controls.autoRotateSpeed = 1.2;
+    controls.target.set(0, 0, 0);
+
+    // 辅助定向光（增强金属高光层次，主照明来自 HDRI 环境）
+    const key = new THREE.DirectionalLight(0xffffff, 1.2);
+    key.position.set(300, 400, 200);
+    scene.add(key);
+
+    /* ================= HDRI 环境贴图（金属不发黑的关键） ================= */
+    // 优先级：polyhaven 工业风（用户指定）→ 本地 hdr/ → jsdelivr → unpkg → RoomEnvironment 兜底
+    const HDR_SOURCES = [
+      'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/industrial_sunset_puresky_1k.hdr',
+      './hdr/studio.hdr',   // ← 占位符：把 HDRI 文件放到 hdr/ 文件夹并命名为 studio.hdr 即可用本地
+      'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/equirectangular/royal_esplanade_1k.hdr',
+      'https://unpkg.com/three@0.160.0/examples/textures/equirectangular/royal_esplanade_1k.hdr'
+    ];
+    const rgbe = new RGBELoader();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+
+    function loadEnvironment(index) {
+      if (index >= HDR_SOURCES.length) {
+        // 全部 HDRI 失败 → RoomEnvironment 程序化环境兜底（金属依然有反射，不发黑）
+        console.warn('[Device03] HDRI 全部加载失败，使用 RoomEnvironment 兜底');
+        scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        loadModel();
+        return;
+      }
+      const url = HDR_SOURCES[index];
+      rgbe.load(url, hdrTex => {
+        console.log('[Device03] HDRI 已加载:', url);
+        hdrTex.mapping = THREE.EquirectangularReflectionMapping;   // 等距柱状反射映射（显式设置）
+        const envMap = pmrem.fromEquirectangular(hdrTex).texture;
+        scene.environment = envMap;      // ← 金属反射来源（必须）
+        scene.background = envMap;       // ← HDRI 背景（控制面板可切换）
+        window.__envMap = envMap;
+        hdrTex.dispose();
+        pmrem.dispose();
+        loadModel();
+      }, e => {
+        if (e && e.total) setProgress(e.loaded / e.total * 100, 'Loading HDRI');
+      }, () => {
+        console.warn('[Device03] HDRI 失败，尝试下一个源:', url);
+        loadEnvironment(index + 1);
+      });
+    }
+
+    /* ================= 模型加载（进度条 + 居中适配） ================= */
+    const loader = new GLTFLoader();
+    function loadModel() {
+      loader.load('./models/device-03.glb', gltf => {
+        const obj = gltf.scene || gltf.scenes[0];
+        scene.add(obj);
+        // 居中：包围盒中心对齐原点（C4D 导出原点常偏离）
+        const box = new THREE.Box3().setFromObject(obj);
+        const center = box.getCenter(new THREE.Vector3());
+        obj.position.add(new THREE.Vector3(-center.x, -center.y, -center.z));
+        box.setFromObject(obj);
+        // 相机适配
+        const sphere = box.getBoundingSphere(new THREE.Sphere());
+        const dist = Math.max(sphere.radius / Math.tan((camera.fov * Math.PI) / 360) * 1.1, sphere.radius * 1.8);
+        camera.position.set(dist * 0.7, dist * 0.5, dist * 0.9);
+        controls.target.set(0, 0, 0);
+        camera.near = Math.max(0.01, sphere.radius * 0.001);
+        camera.far = Math.max(500, dist * 10);
+        camera.updateProjectionMatrix();
+        controls.update();
+        // 加载完成，隐藏覆盖层
+        progressEl.classList.add('hidden');
+        console.log('[Device03] 模型加载完成');
+      }, e => {
+        if (e && e.total) setProgress(e.loaded / e.total * 100, 'Loading Model');
+      }, err => {
+        console.error('[Device03] 模型加载失败:', err);
+        showError('模型加载失败：请确认 models/device-03.glb 已放入 models 文件夹');
+      });
+    }
+
+    // ---------- 自适应 ----------
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // ---------- 渲染循环 ----------
+    renderer.setAnimationLoop(() => {
+      controls.update();          // 自动旋转在 controls 内部处理
+      renderer.render(scene, camera);
+    });
+
+    // 启动：先加载 HDRI 环境，再加载模型
+    loadEnvironment(0);
+  </script>
+</body>
+</html>

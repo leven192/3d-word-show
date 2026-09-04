@@ -1,0 +1,43 @@
+2026-08-30 19:25:08  cpolar-autostart 开始
+2026-08-30 19:25:09  本地服务器未运行，正在启动 server.ps1
+2026-08-30 19:25:13  cpolar 路径: C:\Program Files\cpolar\cpolar.exe
+2026-08-30 19:25:13  cpolar 已在运行（PID 6608），跳过启动
+2026-08-31 08:29:30  cpolar-autostart 开始
+2026-08-31 08:29:31  本地服务器未运行，正在启动 server.ps1
+2026-08-31 08:29:35  cpolar 路径: C:\Program Files\cpolar\cpolar.exe
+2026-08-31 09:19:28  cpolar-autostart 开始
+2026-08-31 09:19:29  本地服务器未运行，正在启动 server.ps1
+2026-08-31 09:19:34  cpolar 路径: C:\Program Files\cpolar\cpolar.exe
+2026-08-31 09:19:34  cpolar 已在运行（PID 6544），跳过启动
+2026-08-31 09:20:34  未在 60 秒内获取到公网地址（cpolar 可能未运行或登录失效，请查看 cpolar 面板）
+2026-08-31 09:20:34  cpolar-autostart 完成
+2026-09-01 08:28:23  cpolar-autostart 开始
+2026-09-01 08:28:24  本地服务器未运行，正在启动 server.ps1
+2026-09-01 08:28:28  cpolar 路径: C:\Program Files\cpolar\cpolar.exe
+2026-09-01 08:28:28  cpolar 已在运行（PID 6164），跳过启动
+2026-09-01 08:29:29  未在 60 秒内获取到公网地址（cpolar 可能未运行或登录失效，请查看 cpolar 面板）
+2026-09-01 08:29:29  cpolar-autostart 完成
+2026-09-01 15:10:33  cpolar-autostart 开始
+2026-09-01 15:10:34  本地服务器未运行，正在启动 server.ps1
+2026-09-01 15:10:38  cpolar 路径: C:\Program Files\cpolar\cpolar.exe
+2026-09-01 15:10:38  cpolar 已在运行（PID 6364），跳过启动
+2026-09-01 15:11:39  未在 60 秒内获取到公网地址（cpolar 可能未运行或登录失效，请查看 cpolar 面板）
+2026-09-01 15:11:39  cpolar-autostart 完成
+2026-09-02 08:07:35  cpolar-autostart 开始
+2026-09-02 08:07:37  本地服务器未运行，正在启动 server.ps1
+2026-09-02 08:07:41  cpolar 路径: C:\Program Files\cpolar\cpolar.exe
+2026-09-02 08:07:41  cpolar 已在运行（PID 924），跳过启动
+2026-09-02 08:08:42  未在 60 秒内获取到公网地址（cpolar 可能未运行或登录失效，请查看 cpolar 面板）
+2026-09-02 08:08:42  cpolar-autostart 完成
+2026-09-03 09:32:56  cpolar-autostart 开始
+2026-09-03 09:32:57  本地服务器未运行，正在启动 server.ps1
+2026-09-03 09:33:02  cpolar 路径: C:\Program Files\cpolar\cpolar.exe
+2026-09-03 09:33:02  cpolar 已在运行（PID 6260），跳过启动
+2026-09-03 09:34:02  未在 60 秒内获取到公网地址（cpolar 可能未运行或登录失效，请查看 cpolar 面板）
+2026-09-03 09:34:02  cpolar-autostart 完成
+2026-09-04 07:54:57  cpolar-autostart 开始
+2026-09-04 07:54:58  本地服务器未运行，正在启动 server.ps1
+2026-09-04 07:55:02  cpolar 路径: C:\Program Files\cpolar\cpolar.exe
+2026-09-04 07:55:02  cpolar 已在运行（PID 6180），跳过启动
+2026-09-04 07:56:03  未在 60 秒内获取到公网地址（cpolar 可能未运行或登录失效，请查看 cpolar 面板）
+2026-09-04 07:56:03  cpolar-autostart 完成
