@@ -356,7 +356,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 21;
+    const ASSET_VER = 22;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -680,9 +680,15 @@
 
     /* ================= 全景缩略模型（有模型→显示缩略，无模型→保留立方体） ================= */
     const thumbObjects = [];   // 全景缩略模型（可点击）
+    // 超大/超多 mesh 模型（如 22RS整线 3480 meshes）：全景缩略加载会使移动端 GPU/内存崩溃
+    // （页面自动退回主厅 = WebGL 崩溃重载）。此类设备全景保留立方体占位，详情直接加载高模。
+    const HEAVY_MODELS = ['models/device-05.glb'];   // 超高面数/多 mesh 模型黑名单
+    const isHeavyModel = (model) => HEAVY_MODELS.includes(model);
     // 加载单台缩略模型（有模型→显示缩略；失败/无文件→保留立方体占位）
     function loadOneThumb(d, i) {
       return new Promise(resolve => {
+        // 超大模型全景不加载 3D 缩略（保留立方体占位，防内存崩溃）
+        if (isHeavyModel(d.model)) { resolve(); return; }
         // 缩略路径：models/device-XX.glb → models/thumb/device-XX.glb；
         // d1(model.glb) → models/thumb/device-01.glb（全景用轻量缩略，避免加载 11MB 原模型）
         const thumbUrl = d.model.startsWith('models/')
@@ -941,12 +947,14 @@
       const token = ++state.loadToken;
       const enterTokenAtCall = state.enterToken;   // 捕获进入令牌：返回/切换会递增它 → 高模就绪后丢弃
       return new Promise(resolve => {
-        // 缩略图（LOD0）：所有设备统一「先显低模缩略（秒出画面）→ 后台升级高模(LOD1)」
+        // 缩略图（LOD0）：常规设备「先显低模缩略（秒出画面）→ 后台升级高模(LOD1)」；
+        // 超大/多 mesh 模型（HEAVY_MODELS）跳过 LOD0，直接加载高模（避免缩略+高模双份
+        // 大模型同时解码/渲染导致移动端 GPU/内存崩溃——「打开即退回主厅」即为此现象）
         // d1(model.glb) → models/thumb/device-01.glb；dN → models/thumb/device-NN.glb
-        // 全景阶段已加载过缩略（命中浏览器缓存），进入详情几乎瞬时出画面
-        const thumbUrl = device.model.startsWith('models/')
-          ? device.model.replace('models/', 'models/thumb/')
-          : 'models/thumb/device-01.glb';
+        const thumbUrl = isHeavyModel(device.model) ? null
+          : device.model.startsWith('models/')
+            ? device.model.replace('models/', 'models/thumb/')
+            : 'models/thumb/device-01.glb';
         const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
         let firstLoaded = null;   // 第一段显示的模型（缩略/LOD0）
 
