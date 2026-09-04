@@ -1056,8 +1056,8 @@
       return new Promise(res => {
         const t0 = performance.now();
         (function ck() {
-          const minShown = (performance.now() - progStartAt) >= 700;   // 至少展示 700ms
-          if ((progCur >= 0.999 && minShown) || performance.now() - t0 > 2500) res();
+          const minShown = (performance.now() - progStartAt) >= 350;   // 至少展示 350ms（借/缓存瞬时也快速进入）
+          if ((progCur >= 0.999 && minShown) || performance.now() - t0 > 2000) res();
           else requestAnimationFrame(ck);
         })();
       });
@@ -1192,12 +1192,23 @@
       const enterTokenAtCall = state.enterToken;   // 捕获进入令牌：返回/切换会递增它 → 高模就绪后丢弃
       return new Promise(resolve => {
         // 分级加载（统一「低模先出画面 → 后台升级」）：
-        //  LOD0 = 移动端中模 (device-XX-mobile.glb / model-mobile.glb)——体积小(2-4MB)秒出画面
+        //  LOD0 = 优先复用全景已加载的缩略模型（已在内存，零下载瞬时显示）；
+        //         无可用缩略时下载移动端中模 (device-XX-mobile.glb / model-mobile.glb)
         //  LOD1 = 精细高模：仅 PC(PERF.upgradeHigh) 在 LOD0 显示后后台加载并无缝替换
+        // 检查全景缩略池中是否有该设备（thumbObjects 内 userData.deviceId 匹配）
+        const idx = state.selectedIndex;
+        let borrowed = null;
+        if (idx >= 0) {
+          const bi = thumbObjects.findIndex(o => o.userData && o.userData.deviceId === idx);
+          if (bi >= 0) {
+            borrowed = thumbObjects.splice(bi, 1)[0];   // 借走：从全景池移除（避免被 release 释放）
+            if (borrowed.parent) borrowed.parent.remove(borrowed);
+          }
+        }
         const thumbUrl = device.model.startsWith('models/')
           ? device.model.replace(/\.glb$/, '-mobile.glb')
           : 'model-mobile.glb';
-        let firstLoaded = null;   // 第一段显示的模型（LOD0 中模）
+        let firstLoaded = null;   // 第一段显示的模型（LOD0：借用缩略 / 中模）
 
         // 模型就位（处理材质 + 入场景）；任何路径都必须 resolve，避免 Loading 卡死
         const finish = (obj) => {
@@ -1257,6 +1268,17 @@
           });
         };
 
+        // 快路径：全景缩略已在内存 → 零下载直接作为 LOD0 显示（瞬时进入详情）
+        if (borrowed) {
+          borrowed.scale.set(1, 1, 1);        // 取消全景缩放(0.85)
+          borrowed.position.set(0, 0, 0);     // 归零（fitDetailView 会重新居中取景）
+          borrowed.rotation.set(0, 0, 0);
+          firstLoaded = borrowed;
+          setProgTarget(1);
+          finish(borrowed);
+          if (PERF.upgradeHigh) loadHigh(true);   // 后台升级高清（无感替换）
+          return;
+        }
         if (thumbUrl) {
           // LOD0：加载中模（2-4MB 秒出画面，先让用户看到模型）
           loadGLB(ver(thumbUrl), gltf => {
