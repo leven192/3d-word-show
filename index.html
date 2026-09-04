@@ -1311,27 +1311,27 @@
           if (PERF.upgradeHigh) loadHigh(true);   // 后台升级高清（无感替换）
           return;
         }
-        if (thumbUrl) {
-          // LOD0：加载中模（2-4MB 秒出画面，先让用户看到模型）
+        // 无借用缩略（全景未加载完就点击）：
+        //  PC → 直接下载高清高模（一次到位，跳过 mobile 中转，避免 low→mid→high 重复下载）
+        //  移动端 → 下载轻量 mobile（中模，够用且不崩）
+        if (!PERF.upgradeHigh && thumbUrl) {
+          // 移动端：下载轻量 mobile 作为详情模型（0.6-3MB 快，单份稳定不崩）
           loadGLB(ver(thumbUrl), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
             const obj = gltf.scene || gltf.scenes[0];
             firstLoaded = obj;
             setProgTarget(1);   // 就绪：进度平滑走到 100%
             finish(obj);
-            // PC：中模显示后，后台加载精细高模（LOD1）并无感替换 → 进详情秒开，细节渐补
-            if (PERF.upgradeHigh) loadHigh(true);
           }, e => {
             if (e && e.total && token === state.loadToken) {
               setProgText('加载 ' + device.name + '…');
               setProgTarget(e.loaded / e.total);
             }
           }, () => {
-            // LOD0 失败：PC 直载高模兜底；移动端结束（显示失败提示）
-            if (PERF.upgradeHigh) loadHigh(true); else resolve(null);
+            resolve(null);   // 加载失败 → 结束（显示失败提示）
           });
         } else {
-          // 兜底：无中模文件 → 直接加载高模
+          // PC：直接下载高清高模（进度遮罩显示真实百分比，一次到位）
           loadHigh(true);
         }
       });
