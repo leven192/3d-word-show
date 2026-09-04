@@ -350,7 +350,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 16;
+    const ASSET_VER = 17;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -669,14 +669,14 @@
     // Draco 解码（models/device-XX.glb 已用 gltf-transform Draco 压缩，体积缩小 6~14 倍）
     const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('./lib/draco/');
-    dracoLoader.setDecoderConfig({ type: 'js' });   // 强制 JS 解码器（wasm 在某些环境编译失败，JS 更兼容）
+    // 不强制 type → wasm 优先（比 JS 快约 10 倍），加载失败自动回退 JS 解码器
     loader.setDRACOLoader(dracoLoader);
 
     /* ================= 全景缩略模型（有模型→显示缩略，无模型→保留立方体） ================= */
     const thumbObjects = [];   // 全景缩略模型（可点击）
-    function loadThumbs() {
-      if (!state.devices.length) return;
-      state.devices.forEach((d, i) => {
+    // 加载单台缩略模型（有模型→显示缩略；失败/无文件→保留立方体占位）
+    function loadOneThumb(d, i) {
+      return new Promise(resolve => {
         // 缩略路径：models/device-XX.glb → models/thumb/device-XX.glb；
         // d1(model.glb) → models/thumb/device-01.glb（全景用轻量缩略，避免加载 11MB 原模型）
         const thumbUrl = d.model.startsWith('models/')
@@ -687,7 +687,7 @@
           markLogoNodes(obj);   // LOGO 打标保留显示，不参与缩放/落地计算
           const box = boxExcl(obj);
           const size = box.getSize(new THREE.Vector3());
-          if (size.x <= 0 || size.y <= 0 || size.z <= 0) return;
+          if (size.x <= 0 || size.y <= 0 || size.z <= 0) { resolve(); return; }
           // 缩放到占位立方体尺寸（0.85），最长边为基准
           const scale = 0.85 / Math.max(size.x, size.y, size.z);
           obj.scale.setScalar(scale);
@@ -713,8 +713,20 @@
           bodyMesh.instanceMatrix.needsUpdate = true;
           baseMesh.instanceMatrix.needsUpdate = true;
           console.log('[线上展厅] 全景缩略已加载:', d.name, '(' + thumbUrl + ')');
-        }, null, () => { /* 无缩略文件 → 保留立方体占位 */ });
+          resolve();
+        }, null, () => { resolve(); });   // 无缩略文件 → 保留立方体占位
       });
+    }
+    // 渐进式加载全部缩略：一台台串行加载，首台尽快出画面，后续在后台逐台补齐
+    // （避免首屏一次性并发下载全部缩略图阻塞；wasm 解码器亦更快）
+    function loadThumbs() {
+      if (!state.devices.length) return;
+      (async () => {
+        for (let i = 0; i < state.devices.length; i++) {
+          await loadOneThumb(state.devices[i], i);
+        }
+        console.log('[线上展厅] 全部全景缩略加载完成');
+      })();
     }
 
     /* ================= 内存管理：递归释放模型资源 ================= */
