@@ -749,6 +749,8 @@
       let done = false;
       const safeLoad = (buf) => {
         if (done) return; done = true;
+        // 解析(含 Draco 解码)前进度置 100%：下载/缓存已就绪，避免解码期停留 0% 或中途百分比
+        if (onProgress) onProgress({ loaded: 1, total: 1 });
         try { loader.parse(buf, '', onLoad, onError); }
         catch (e) { if (onError) onError(e); }
       };
@@ -756,7 +758,10 @@
         // 1) 尝试缓存
         let buf = null;
         try { buf = await idbGet(url); } catch (e) { buf = null; }
-        if (buf) { safeLoad(buf); return; }
+        if (buf) {
+          if (onProgress) onProgress({ loaded: 1, total: 1 });   // 缓存命中：立即 100%（读取中）
+          safeLoad(buf); return;
+        }
         // 2) 网络下载（XHR 支持进度）
         try {
           const xhr = new XMLHttpRequest();
