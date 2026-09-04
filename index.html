@@ -969,6 +969,39 @@
       }
     }
 
+    /* ================= 平滑进度动画（详情模型加载） =================
+     * 真实下载进度作为「目标值」驱动，显示值缓动爬升 → 无论缓存命中还是瞬时下载，
+     * 百分比都平滑从 0 走到 100，不会 0→100 跳变，也不会卡 0%。
+     */
+    let progCur = 0, progTarget = 0, progRAF = 0, progText = '加载中…';
+    function setProgText(t) { progText = t; }
+    function setProgTarget(t) {
+      progTarget = Math.max(progTarget, Math.min(1, t));   // 只增不减
+      if (!progRAF) progRAF = requestAnimationFrame(progStep);
+    }
+    function progStep() {
+      progCur += (progTarget - progCur) * 0.1 + 0.004;     // 缓动 + 恒定最小增量
+      if (progCur >= 1) progCur = 1;
+      overlay.classList.remove('hidden', 'error');
+      loadingText.textContent = progText;
+      const p = Math.round(progCur * 100);
+      progressBar.style.width = p + '%';
+      progressPct.textContent = p + '%';
+      if (progCur < 1) progRAF = requestAnimationFrame(progStep);
+      else { progRAF = 0; }
+    }
+    // 等待进度动画到达 100%（成功路径用；上限 1.6s 兜底防卡）
+    function waitProgDone() {
+      return new Promise(res => {
+        const t0 = performance.now();
+        (function ck() {
+          if (progCur >= 0.999 || performance.now() - t0 > 1600) res();
+          else requestAnimationFrame(ck);
+        })();
+      });
+    }
+    function stopProgressAnim() { if (progRAF) { cancelAnimationFrame(progRAF); progRAF = 0; } }
+
     /* ================= 详情面板 ================= */
     const panel = document.getElementById('detail-panel');
     const panelName = panel.querySelector('.dp-name');
@@ -1133,8 +1166,9 @@
             // 替换：卸载缩略 → 显示高模（先记住缩略的居中平移量）
             const prevPos = firstLoaded ? firstLoaded.position.clone() : null;
             if (firstLoaded) { sceneHigh.remove(firstLoaded); disposeObject(firstLoaded); firstLoaded = null; }
+            setProgTarget(1);   // 就绪：驱动进度平滑走到 100%
             finish(obj);
-            setLoading(false);                          // 保险：确保遮罩关闭
+            stopProgressAnim();
             setStatus('模型已加载（高清）', 'ok');       // 状态栏更新，不遮罩
             // 高模替换缩略后的取景处理：新 obj 的 position 是默认值，未继承缩略的居中平移，
             // 否则模型会偏离旋转中心、360° 观察不顺
@@ -1148,12 +1182,8 @@
             console.log('[线上展厅] 已升级为高清模型 (LOD1):', device.model);
           }, e => {
             if (e && e.total) {
-              if (!firstLoaded) {
-                // 无缩略（如设备1）：直接加载高模，显示进度条
-                setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
-              } else {
-                console.log('[线上展厅] 高清模型加载中', (e.loaded / e.total * 100).toFixed(0) + '%');
-              }
+              setProgText('加载 ' + device.name + '…');
+              setProgTarget(e.loaded / e.total);   // 平滑动画驱动，不直接跳
             }
           }, () => {
             console.warn('[线上展厅] 高清模型失败' + (allowRetry ? '，重试一次' : ''));
@@ -1168,19 +1198,21 @@
         };
 
         if (thumbUrl) {
-          // 移动端：先加载缩略（秒显，LOD0）
+          // 移动端：加载中模（秒出画面）
           loadGLB(ver(thumbUrl), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
             const obj = gltf.scene || gltf.scenes[0];
             firstLoaded = obj;
+            setProgTarget(1);   // 就绪：进度平滑走到 100%
             finish(obj);
-            // 移动端保持缩略（PERF.upgradeHigh=false，单份低模最稳）
+            // 移动端保持中模（PERF.upgradeHigh=false，单份稳定）
           }, e => {
             if (e && e.total && token === state.loadToken) {
-              setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
+              setProgText('加载 ' + device.name + '…');
+              setProgTarget(e.loaded / e.total);
             }
           }, () => {
-            // 缩略失败 → 结束加载（详情显示失败提示）
+            // 加载失败 → 结束加载（详情显示失败提示）
             resolve(null);
           });
         } else {
@@ -1210,7 +1242,11 @@
       // 若之前详情模式有模型 → 先卸载（切换到另一台设备时）
       unloadHighModel();
 
+      // 平滑进度动画启动（0 起步自动爬升；下载/缓存的真实进度更新目标值；
+      // 模型就绪后目标=1 → 进度平滑走到 100% 才关闭遮罩 → 百分比始终正确显示）
+      setProgText('加载 ' + device.name + '…');
       setLoading(true, '飞入特写 · 加载 ' + device.name + '…', 0);
+      setProgTarget(0.04);   // 起步目标，防卡 0%
       const view = detailView(i);
       const flyP = flyTo(view.pos, view.tgt, 900);
       const loadP = loadHighModel(device);
@@ -1224,9 +1260,11 @@
       if (model) {
         fitDetailView(model);
         setStatus('模型已加载', 'ok');
+        await waitProgDone();   // 等平滑进度走到 100% 再关遮罩（保证百分比完整显示）
       } else {
         setStatus('模型加载失败（' + device.model + ' 不存在？）', 'err');
       }
+      stopProgressAnim();
       setLoading(false);
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.DETAIL;
@@ -1243,6 +1281,7 @@
       state.enterToken++;           // 使进行中的进入流程失效
       state.mode = Mode.TRANSITION;
 
+      stopProgressAnim();   // 停止详情进度动画
       setLoading(true, '返回全景…');
       rendererHigh.domElement.style.cursor = 'wait';
 
