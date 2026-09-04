@@ -335,6 +335,27 @@
     const progressBar = document.getElementById('progress-bar');
     const progressPct = document.getElementById('progress-pct');
 
+    /* ============ PC / 移动端性能分级（全局） ============
+     * isMobile：UA 或屏幕宽度 <768px 判定
+     * PERF 分级参数：像素比 / 抗锯齿 / 阴影 / 详情是否升级高模 / 材质降级
+     */
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile|MicroMessenger/i.test(navigator.userAgent)
+      || innerWidth < 768;
+    const PERF = isMobile ? {
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),  // 移动端 ≤1.5
+      antialias: false,                                         // 移动端关抗锯齿
+      shadows: false,                                           // 移动端关阴影
+      upgradeHigh: false,                                       // 移动端详情只用低模(缩略)
+      downgradeMaterial: true                                   // 移动端 PBR→Phong
+    } : {
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),    // PC ≤2
+      antialias: true,                                          // PC 开抗锯齿
+      shadows: true,                                            // PC 开阴影
+      upgradeHigh: true,                                        // PC 升级高清
+      downgradeMaterial: false
+    };
+    // 兼容旧引用：isMobile 已全局化（下方各函数直接用）
+
     // 模型资源版本号：仅在模型/缩略图文件内容更新时递增！
     // 页面逻辑改动（UI/性能）不递增 → 已下载的 glb 命中浏览器缓存，避免每次改版都重下几十 MB
     const MODEL_VER = 33;
@@ -403,24 +424,23 @@
       userTouched: false,    // 用户是否已手动旋转/缩放详情相机（高模替换后不再强制重置视角）
     };
 
-    /* ================= 双层渲染器 ================= */
+    /* ================= 双层渲染器（PC/移动端分级） ================= */
     const app = document.getElementById('app');
     function makeRenderer(alpha, id) {
       let r;
-      try { r = new THREE.WebGLRenderer({ antialias: true, alpha }); }
+      try { r = new THREE.WebGLRenderer({ antialias: PERF.antialias, alpha, powerPreference: 'high-performance' }); }
       catch (e1) {
         try { r = new THREE.WebGLRenderer({ antialias: false, alpha }); }
         catch (e2) { showFatal('WebGL 不可用'); throw e2; }
       }
-      // 渲染分辨率：桌面限 2x，移动端限 1.5x（帧率更稳，视觉差别小，显著降低 GPU 负担）
-      const ratio = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? 1.5 : 2;
-      r.setPixelRatio(Math.min(devicePixelRatio, ratio));
+      r.setPixelRatio(PERF.pixelRatio);   // PC≤2 / 移动≤1.5（按 PERF 分级）
       r.setSize(innerWidth, innerHeight);
       r.outputColorSpace = THREE.SRGBColorSpace;
       r.toneMapping = THREE.ACESFilmicToneMapping;   // 电影级色调映射
-      r.toneMappingExposure = 1.0;                  // 曝光 1.15（实测校准：不过曝、细节清晰）
-      r.shadowMap.enabled = true;                    // 阴影（主光源投射，体现体积感）
-      r.shadowMap.type = THREE.PCFSoftShadowMap;
+      r.toneMappingExposure = 1.0;
+      // 阴影：PC 开启；移动端关闭（显著降低 GPU 压力）
+      r.shadowMap.enabled = PERF.shadows;
+      if (PERF.shadows) r.shadowMap.type = THREE.PCFSoftShadowMap;
       r.domElement.id = id;
       app.appendChild(r.domElement);
       return r;
@@ -690,6 +710,7 @@
         loader.load(ver(thumbUrl), gltf => {
           const obj = gltf.scene || gltf.scenes[0];
           markLogoNodes(obj);   // LOGO 打标保留显示，不参与缩放/落地计算
+          if (PERF.downgradeMaterial) downgradeMobileMaterial(obj);   // 移动端全景缩略同样 PBR→Phong
           const box = boxExcl(obj);
           const size = box.getSize(new THREE.Vector3());
           if (size.x <= 0 || size.y <= 0 || size.z <= 0) { resolve(); return; }
@@ -937,6 +958,42 @@
         }
       });
     }
+    // 移动端材质降级：PBR(Standard/Physical) → Phong，移除环境贴图反射，
+    // 显著降低着色器/纹理开销（保留颜色与贴图；金属感由高光近似）
+    function downgradeMobileMaterial(obj) {
+      obj.traverse(o => {
+        if (!o.isMesh || !o.material) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        o.material = mats.map(m => {
+          if (!m || m.isMeshPhongMaterial || m.isMeshLambertMaterial || m.isMeshBasicMaterial) return m;
+          const phong = new THREE.MeshPhongMaterial({
+            color: (m.color || new THREE.Color(0xcccccc)).clone(),
+            emissive: m.emissive ? m.emissive.clone() : new THREE.Color(0),
+            emissiveIntensity: m.emissiveIntensity !== undefined ? m.emissiveIntensity : 0,
+            shininess: 40,               // 近似金属高光
+            specular: new THREE.Color(0x666666),
+            transparent: m.transparent === true,
+            opacity: m.opacity !== undefined ? m.opacity : 1,
+            side: m.side !== undefined ? m.side : THREE.FrontSide,
+            depthWrite: m.depthWrite !== undefined ? m.depthWrite : true
+          });
+          // 贴图保留（map/normalMap 等；none 则纯色）
+          if (m.map) { phong.map = m.map; }
+          if (m.normalMap) { phong.normalMap = m.normalMap; }
+          if (m.alphaMap) { phong.alphaMap = m.alphaMap; }
+          phong.envMap = null;           // 移除环境反射（性能关键）
+          phong.needsUpdate = true;
+          if (m !== phong) m.dispose();
+          return phong;
+        });
+        o.material = Array.isArray(o.material) && o.material.length === 1 ? o.material[0] : o.material;
+      });
+    }
+    // 模型就位统一材质处理：PC 增强金属可见性；移动端降级 PBR→Phong（性能分级）
+    function adaptMaterial(obj) {
+      if (PERF.downgradeMaterial) downgradeMobileMaterial(obj);
+      else ensureMetalVisible(obj);
+    }
     function loadHighModel(device) {
       const token = ++state.loadToken;
       const enterTokenAtCall = state.enterToken;   // 捕获进入令牌：返回/切换会递增它 → 高模就绪后丢弃
@@ -949,7 +1006,6 @@
           : device.model.startsWith('models/')
             ? device.model.replace('models/', 'models/thumb/')
             : 'models/thumb/device-01.glb';
-        const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
         let firstLoaded = null;   // 第一段显示的模型（缩略/LOD0）
 
         // 模型就位（处理材质 + 入场景）；任何路径都必须 resolve，避免 Loading 卡死
@@ -957,7 +1013,7 @@
           if (token !== state.loadToken) { sceneHigh.remove(obj); disposeObject(obj); resolve(null); return; }
           markLogoNodes(obj);   // LOGO 打标保留显示（取景时经 boxExcl 排除，不影响旋转中心）
           boostTextures(obj);
-          ensureMetalVisible(obj);
+          adaptMaterial(obj);   // 分级：PC 增强金属 / 移动端 PBR→Phong 降级
           setEnvIntensity(params.envIntensity);
           sceneHigh.add(obj);
           state.highModel = obj;
@@ -1017,15 +1073,15 @@
             const obj = gltf.scene || gltf.scenes[0];
             firstLoaded = obj;
             finish(obj);
-            // 桌面端后台升级高清模型（LOD1）；手机端保持缩略（最稳：单份低模，杜绝详情崩溃）
-            if (!isMobile) loadHigh();
+            // PC：后台升级高清模型（LOD1）；移动端保持缩略（PERF.upgradeHigh=false，单份低模最稳）
+            if (PERF.upgradeHigh) loadHigh();
           }, e => {
             if (e && e.total && token === state.loadToken) {
               setLoading(true, '加载 ' + device.name + '…', e.loaded / e.total);
             }
           }, () => {
-            // 缩略失败 → 直接加载高模（高模成功/失败都会 resolve）；手机端也无高模可加载时由 finish 兜底
-            if (!isMobile) loadHigh(); else resolve(null);
+            // 缩略失败 → PC 直接加载高模；移动端由 resolve(null) 兜底（详情显示失败提示）
+            if (PERF.upgradeHigh) loadHigh(); else resolve(null);
           });
         } else {
           // 无缩略文件 → 直接加载高模
