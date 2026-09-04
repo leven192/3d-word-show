@@ -1478,16 +1478,22 @@
       document.body.classList.add('in-detail');   // 隐藏侧栏/分享，面板独占左下角
       releaseThumbnails();   // 归还全景缩略显存
 
-      // 模型就绪后（借用=瞬时 / 下载=完成后）补充取景与状态
-      loadP.then(model => {
+      // 取景必须在飞行动画结束后执行（flyTo 会持续改写相机，期间 fitDetailView 会被覆盖 →
+      // 模型被居中但相机未对准 → 360° 旋转偏离中心）
+      const fitWhenReady = (model) => {
         if (token !== state.enterToken) return;
         if (model) {
-          fitDetailView(model);
+          fitDetailView(model);   // 模型平移居中 + 相机对准（相机此时静止）
           setStatus('模型已加载', 'ok');   // 高清升级完成时 loadHigh 会再置「已加载（高清）」
         } else {
           setStatus('模型加载失败（' + device.model + ' 不存在？）', 'err');
         }
-      }).catch(() => {});
+      };
+      if (state.highModel) {
+        fitWhenReady(state.highModel);   // 借用缩略已就绪：立即取景（保证居中）
+      } else {
+        loadP.then(fitWhenReady).catch(() => {});   // 下载中：就绪后取景
+      }
       console.log('[线上展厅] 进入详情模式:', device.name);
     }
 
