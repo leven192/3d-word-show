@@ -1189,7 +1189,7 @@
             }
           }, () => {
             console.warn('[线上展厅] 高清模型失败' + (allowRetry ? '，重试一次' : ''));
-            setLoading(false);   // 保险：确保遮罩关闭
+            // 遮罩由 enterDetail 统一关闭，这里不操作
             if (allowRetry && token === state.loadToken) {
               // 网络抖动自动重试一次（PC 直载路径，避免"模型显示不出来"）
               setTimeout(() => loadHigh(false), 800);
@@ -1246,6 +1246,8 @@
 
       // 平滑进度动画启动（0 起步自动爬升；下载/缓存的真实进度更新目标值；
       // 模型就绪后目标=1 → 进度平滑走到 100% 才关闭遮罩 → 百分比始终正确显示）
+      stopProgressAnim();          // 终止上一轮动画（防残留）
+      progCur = 0; progTarget = 0; // 每次进入从 0 开始
       setProgText('加载 ' + device.name + '…');
       setLoading(true, '飞入特写 · 加载 ' + device.name + '…', 0);
       setProgTarget(0.04);   // 起步目标，防卡 0%
