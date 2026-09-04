@@ -357,7 +357,7 @@
 
     // 模型资源版本号：仅在模型/缩略图文件内容更新时递增！
     // 页面逻辑改动（UI/性能）不递增 → 已下载的 glb 命中浏览器缓存，避免每次改版都重下几十 MB
-    const MODEL_VER = 28;
+    const MODEL_VER = 29;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + MODEL_VER;
 
     function showFatal(msg) {
@@ -683,9 +683,9 @@
 
     /* ================= 全景缩略模型（有模型→显示缩略，无模型→保留立方体） ================= */
     const thumbObjects = [];   // 全景缩略模型（可点击）
-    // 超大/超多 mesh 模型（如 22RS整线 3480 meshes）：全景缩略加载会使移动端 GPU/内存崩溃
-    // （页面自动退回主厅 = WebGL 崩溃重载）。此类设备全景保留立方体占位，详情直接加载高模。
-    const HEAVY_MODELS = ['models/device-05.glb', 'models/device-06.glb', 'models/device-07.glb', 'models/device-08.glb'];   // 超高面数/多 mesh 模型黑名单（全景跳过缩略，防崩溃/减首屏流量）
+    // 缩略图已全部经 simplify+join 轻量化（mesh 数从数千降到 ~100、体积 2-6MB），
+    // 全景可直接显示；此黑名单暂空（原用于跳过超大缩略防移动端崩溃）
+    const HEAVY_MODELS = [];
     const isHeavyModel = (model) => HEAVY_MODELS.includes(model);
     // 加载单台缩略模型（有模型→显示缩略；失败/无文件→保留立方体占位）
     function loadOneThumb(d, i) {
