@@ -220,7 +220,7 @@
     /* ========== 详情内高模加载进度条（顶部细条，不遮模型画面） ========== */
     #hi-progress {
       position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-      z-index: 25; width: min(300px, 70vw);
+      z-index: 25; width: min(340px, 80vw);
       background: rgba(16,20,30,.82); border: 1px solid rgba(255,255,255,.14);
       border-radius: 20px; padding: 6px 14px;
       display: flex; align-items: center; gap: 10px;
@@ -228,6 +228,7 @@
       transition: opacity .3s;
     }
     #hi-progress.hidden { opacity: 0; pointer-events: none; }
+    #hi-label { color: #e8ecf4; font-size: 12px; font-weight: 600; white-space: nowrap; }
     #hi-bar { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden; }
     #hi-bar::after { content: ''; display: block; height: 100%; width: var(--w, 0%); background: linear-gradient(90deg,#4da3ff,#7c6bff); transition: width .15s; }
     #hi-pct { color: #9fc6ff; font-size: 12px; font-weight: 700; min-width: 34px; text-align: right; }
@@ -307,8 +308,9 @@
 
   <button id="lobby-btn" title="返回大厅">⌂ 返回大厅</button>
 
-  <!-- 详情内高模加载进度条（顶部细条，不遮画面；后台下载/升级高清时显示） -->
+  <!-- 详情内高模加载进度条（顶部细条，不遮画面；低模显示时同步展示高清下载进度） -->
   <div id="hi-progress" class="hidden">
+    <span id="hi-label">加载高模</span>
     <div id="hi-bar"></div>
     <span id="hi-pct">0%</span>
   </div>
@@ -1337,6 +1339,7 @@
         // 不能拿 mode 判断（直接加载高模时 enterDetail 仍在 await，mode 尚未变为 DETAIL）
         const loadHigh = (allowRetry) => {
           state.upgrading = true;
+          showHiProgress(0);   // 低模秒进后立即显示高模加载进度（0% 起步）
           loadGLB(ver(device.model), gltf => {
             state.upgrading = false;
             if (token !== state.loadToken) { resolve(null); return; }
@@ -1364,8 +1367,8 @@
             }
             console.log('[线上展厅] 已升级为高清模型 (LOD1):', device.model);
           }, e => {
-            // 面板状态 + 顶部细进度条显示真实下载百分比（画面已进入，无全屏遮罩）
-            if (e && e.total && state.mode === Mode.DETAIL && token === state.loadToken) {
+            // 面板状态 + 顶部细进度条显示真实下载百分比（低模已显示，全程可见进度）
+            if (e && e.total && state.mode !== Mode.OVERVIEW && token === state.loadToken) {
               const pct = Math.round(e.loaded / e.total * 100);
               console.log('[高清加载]', device.name, pct + '%');
               setStatus('加载 ' + device.name + '… ' + pct + '%', 'loading');
