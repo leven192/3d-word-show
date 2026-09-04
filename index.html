@@ -966,8 +966,8 @@
         }
         console.log('[线上展厅] 全部全景缩略加载完成');
         // 后台静默预取各设备高模到 IndexedDB（点击进详情时直接命中缓存 → 高清秒开）
-        // 仅 PC 预取（移动端不加载高模）；逐个下载，避免并发带宽抢占
-        if (PERF.upgradeHigh && state.devices.length) {
+        // PC/移动端均预取（移动端也升级高清，缓存两端通用）；逐个下载，避免并发带宽抢占
+        if (state.devices.length) {
           setTimeout(() => {
             (async () => {
               for (let i = 0; i < state.devices.length; i++) {
@@ -1406,20 +1406,22 @@
         //  PC → 直接下载高清高模（一次到位，跳过 mobile 中转，避免 low→mid→high 重复下载）
         //  移动端 → 下载轻量 mobile（中模，够用且不崩）
         if (!PERF.upgradeHigh && thumbUrl) {
-          // 移动端：下载轻量 mobile 作为详情模型（0.6-3MB 快，单份稳定不崩）
+          // 移动端：先显示轻量 mobile（0.6-3MB 快，圆柱圆），随后台升级高清（同 PC 效果）
           loadGLB(ver(thumbUrl), gltf => {
             if (token !== state.loadToken) { resolve(null); return; }
             const obj = gltf.scene || gltf.scenes[0];
             firstLoaded = obj;
             setProgTarget(1);   // 就绪：进度平滑走到 100%
             finish(obj);
+            loadHigh(true);   // 中模显示后后台升级高清（无感替换；失败保留中模不崩）
           }, e => {
             if (e && e.total && token === state.loadToken) {
               setProgText('加载 ' + device.name + '…');
               setProgTarget(e.loaded / e.total);
             }
           }, () => {
-            resolve(null);   // 加载失败 → 结束（显示失败提示）
+            // mobile 失败 → 直接尝试高清
+            loadHigh(true);
           });
         } else {
           // PC：直接下载高清高模（进度遮罩显示真实百分比，一次到位）
