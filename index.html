@@ -1254,6 +1254,11 @@
       setProgText('加载 ' + device.name + '…');
       setLoading(true, '飞入特写 · 加载 ' + device.name + '…', 0);
       setProgTarget(0.04);   // 起步目标，防卡 0%
+      // 时间兜底：真实下载进度事件到达前，百分比按时间自动缓升（避免早期一直停 4%）。
+      // 真实进度(setProgTarget)取较大值自动接管；就绪置 100。
+      const boostTimers = [280, 560, 850, 1150, 1500, 2000].forEach((ms, idx) => {
+        setTimeout(() => { if (progCur < 0.9) setProgTarget([0.12, 0.25, 0.4, 0.55, 0.7, 0.85][idx]); }, ms);
+      });
       const view = detailView(i);
       const flyP = flyTo(view.pos, view.tgt, 900);
       const loadP = loadHighModel(device);
