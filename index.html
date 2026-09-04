@@ -356,7 +356,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 24;
+    const ASSET_VER = 25;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -682,7 +682,7 @@
     const thumbObjects = [];   // 全景缩略模型（可点击）
     // 超大/超多 mesh 模型（如 22RS整线 3480 meshes）：全景缩略加载会使移动端 GPU/内存崩溃
     // （页面自动退回主厅 = WebGL 崩溃重载）。此类设备全景保留立方体占位，详情直接加载高模。
-    const HEAVY_MODELS = ['models/device-05.glb'];   // 超高面数/多 mesh 模型黑名单
+    const HEAVY_MODELS = ['models/device-05.glb', 'models/device-07.glb'];   // 超高面数/多 mesh 模型黑名单
     const isHeavyModel = (model) => HEAVY_MODELS.includes(model);
     // 加载单台缩略模型（有模型→显示缩略；失败/无文件→保留立方体占位）
     function loadOneThumb(d, i) {
