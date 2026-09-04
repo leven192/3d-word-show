@@ -74,8 +74,8 @@
     },
     {
       "id": "d6",
-      "name": "41RL压机",
-      "desc": "41RL压机",
+      "name": "43RL压机",
+      "desc": "43RL压机",
       "thumbnail": "",
       "model": "models/device-06.glb",
       "params": [
