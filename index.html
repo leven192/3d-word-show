@@ -350,7 +350,7 @@
     const progressPct = document.getElementById('progress-pct');
 
     // 资源版本号：模型更新后递增，破 CDN/微信缓存（避免看到旧模型）
-    const ASSET_VER = 15;
+    const ASSET_VER = 16;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + ASSET_VER;
 
     function showFatal(msg) {
@@ -684,8 +684,8 @@
           : 'models/thumb/device-01.glb';
         loader.load(ver(thumbUrl), gltf => {
           const obj = gltf.scene || gltf.scenes[0];
-          stripDetachedLogo(obj);   // 移除散落 LOGO 节点（避免拉偏包围盒/缩放/落地）
-          const box = new THREE.Box3().setFromObject(obj);
+          markLogoNodes(obj);   // LOGO 打标保留显示，不参与缩放/落地计算
+          const box = boxExcl(obj);
           const size = box.getSize(new THREE.Vector3());
           if (size.x <= 0 || size.y <= 0 || size.z <= 0) return;
           // 缩放到占位立方体尺寸（0.85），最长边为基准
@@ -693,7 +693,7 @@
           obj.scale.setScalar(scale);
           // 缩放后重算包围盒（world matrix 需更新才会反映 scale）
           obj.updateMatrixWorld(true);
-          box.setFromObject(obj);
+          box.copy(boxExcl(obj));
           const c = box.getCenter(new THREE.Vector3());
           const p = devicePositions[i];
           // 底部对齐地面（y=0）：-box.min.y 使模型完整立于地面，不埋入/不悬空
@@ -739,24 +739,32 @@
       console.log('[线上展厅] 已卸载高精度模型，内存已释放');
     }
 
-    // 移除「耐固LOGO」独立节点（部分导出模型的 LOGO 节点 translation 远离主体，
-    // 会拉偏包围盒 → 旋转中心偏移、360° 观察不顺）。保留在主体位置的 LOGO 贴图/文字。
-    function stripDetachedLogo(obj) {
+    // 标记「耐固LOGO」独立节点：不删除（LOGO 按模型位置正常显示），仅打标
+    // 使 boxExcl 在计算包围盒/取景时排除 LOGO，避免其拉偏旋转中心与缩放比例
+    function markLogoNodes(obj) {
       if (!obj) return;
-      const toRemove = [];
       obj.traverse(o => {
-        // 只处理顶层附近的 LOGO 节点（有 Mesh 子级且名字含 LOGO/耐固）
         if (o.isMesh) return;
         if (/耐固LOGO|LOGO\.\d|^LOGO$/i.test(o.name || '')) {
           let hasMesh = false;
           o.traverse(c => { if (c.isMesh) hasMesh = true; });
-          if (hasMesh) toRemove.push(o);
+          if (hasMesh) { o.userData.isLogo = true; o.traverse(c => { c.userData.isLogo = true; }); }
         }
       });
-      toRemove.forEach(n => {
-        if (n.parent) { n.parent.remove(n); disposeObject(n); }
-      });
-      if (toRemove.length) console.log('[线上展厅] 已移除散落 LOGO 节点 ×' + toRemove.length);
+    }
+
+    // 计算排除 LOGO 子树的包围盒（LOGO 仍渲染显示，但不参与缩放/取景/落地计算）
+    function boxExcl(obj) {
+      const box = new THREE.Box3();
+      obj.updateMatrixWorld(true);
+      const stack = [obj];
+      while (stack.length) {
+        const n = stack.pop();
+        if (n.userData && n.userData.isLogo) continue;   // 跳过 LOGO 整棵子树
+        if (n.isMesh) box.expandByObject(n);
+        for (const c of n.children || []) stack.push(c);
+      }
+      return box;
     }
 
     /* ================= 相机飞行（平滑缓动） ================= */
@@ -926,7 +934,7 @@
         // 模型就位（处理材质 + 入场景）；任何路径都必须 resolve，避免 Loading 卡死
         const finish = (obj) => {
           if (token !== state.loadToken) { sceneHigh.remove(obj); disposeObject(obj); resolve(null); return; }
-          stripDetachedLogo(obj);   // 移除散落 LOGO 节点（避免拉偏包围盒/旋转中心）
+          markLogoNodes(obj);   // LOGO 打标保留显示（取景时经 boxExcl 排除，不影响旋转中心）
           boostTextures(obj);
           ensureMetalVisible(obj);
           setEnvIntensity(params.envIntensity);
@@ -1085,13 +1093,14 @@
 
     // 特写取景：①模型居中（旋转中心=模型中心，触控流畅的关键）
     //          ②相机/目标点同步平移 + 距离适配
+    // 用 boxExcl：LOGO 打标后仍显示，但不参与取景（避免其远离主体时拉偏旋转中心）
     function fitDetailView(obj) {
-      const box = new THREE.Box3().setFromObject(obj);
+      const box = boxExcl(obj);
       if (box.isEmpty()) return;
       const center = box.getCenter(new THREE.Vector3());
       // 1) 模型居中：把包围盒中心平移到 (0, 0.3, 0)，让旋转轴对准模型中心
       obj.position.add(new THREE.Vector3(-center.x, 0.3 - center.y, -center.z));
-      box.setFromObject(obj);
+      box.copy(boxExcl(obj));
       const r = box.getBoundingSphere(new THREE.Sphere()).radius;
       const want = Math.max(r / Math.tan((camera.fov * Math.PI) / 360) * 1.15, r * 2);
       // 2) 目标点归位到模型中心，相机同步平移保持相对位置
@@ -1129,9 +1138,8 @@
         controls.target.copy(hits[0].point);   // 定点：旋转/放大中心移到命中处
         controls.dollyIn(1.35);                // 拉近一级
       } else {
-        // 双击空白：回到模型整体视角（fitDetailView 重定位）
-        const box = new THREE.Box3().setFromObject(state.highModel);
-        const c = box.getCenter(new THREE.Vector3());
+        // 双击空白：回到模型整体视角（fitDetailView 重定位，排除 LOGO）
+        const c = boxExcl(state.highModel).getCenter(new THREE.Vector3());
         controls.target.set(c.x, c.y, c.z);
       }
     });
