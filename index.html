@@ -435,6 +435,7 @@
       enterToken: 0,         // 进入流程令牌：返回/切换会使其失效
       exitToken: 0,          // 退出流程令牌
       userTouched: false,    // 用户是否已手动旋转/缩放详情相机（高模替换后不再强制重置视角）
+      upgrading: false,      // 是否后台高清升级中（状态栏显示百分比）
     };
 
     /* ================= 双层渲染器（PC/移动端分级） ================= */
@@ -1259,7 +1260,9 @@
         // 用 enterToken 判断「是否已被返回/切换打断」：进入流程中 mode 是 TRANSITION，
         // 不能拿 mode 判断（直接加载高模时 enterDetail 仍在 await，mode 尚未变为 DETAIL）
         const loadHigh = (allowRetry) => {
+          state.upgrading = true;
           loadGLB(ver(device.model), gltf => {
+            state.upgrading = false;
             if (token !== state.loadToken) { resolve(null); return; }
             if (state.enterToken !== enterTokenAtCall) {   // 已返回全景或切换到其它设备 → 丢弃
               const drop = gltf.scene || gltf.scenes[0];
@@ -1284,11 +1287,13 @@
             }
             console.log('[线上展厅] 已升级为高清模型 (LOD1):', device.model);
           }, e => {
-            // LOD1 完全后台：进度仅记录日志，不影响已关闭的遮罩
-            if (e && e.total) {
-              console.log('[线上展厅] 高清模型加载中', (e.loaded / e.total * 100).toFixed(0) + '%');
+            // 面板状态显示真实下载百分比（画面已进入，无全屏遮罩）
+            if (e && e.total && state.mode === Mode.DETAIL && token === state.loadToken) {
+              const pct = Math.round(e.loaded / e.total * 100);
+              setStatus('加载 ' + device.name + '… ' + pct + '%', 'loading');
             }
           }, () => {
+            state.upgrading = false;
             console.warn('[线上展厅] 高清模型失败' + (allowRetry ? '，重试一次' : ''));
             // 遮罩由 enterDetail 统一关闭，这里不操作
             if (allowRetry && token === state.loadToken) {
@@ -1357,8 +1362,6 @@
       // 若之前详情模式有模型 → 先卸载（切换到另一台设备时）
       unloadHighModel();
 
-      // 平滑进度：完全由真实下载进度驱动（loaded/total 直接赋值，可随时更新）；
-      // 就绪置 100 → 平滑走完才关遮罩。无任何"模拟/兜底"虚报值（避免百分比与真实不符）
       stopProgressAnim();          // 终止上一轮动画（防残留）
       progCur = 0; progTarget = 0; // 每次进入从 0 开始
       setProgText('加载 ' + device.name + '…');
@@ -1366,29 +1369,32 @@
       setProgTarget(0.04);   // 起步目标，防卡 0%（真实进度到达后立即覆盖）
       const view = detailView(i);
       const flyP = flyTo(view.pos, view.tgt, 900);
+      // 模型加载不阻塞进入：飞行结束立即进画面（借用缩略瞬时显示；下载中画面为空+面板显示百分比）
       const loadP = loadHighModel(device);
 
-      const [, model] = await Promise.all([flyP, loadP]);
+      await flyP;
       if (token !== state.enterToken) { unloadHighModel(); return; }  // 已被返回/切换打断
 
-      // 背景虚化 + 高模特写取景（模型尺寸适配相机距离）
+      // 立即进详情画面（不等待模型下载完成——避免慢网下卡加载遮罩 1 分钟）
       app.classList.add('blur');
       sceneHigh.background = new THREE.Color(0xb8bdc5);   // 详情亮灰背景（明亮清晰环境）
-      if (model) {
-        fitDetailView(model);
-        // 立即关遮罩显示画面（低模/缩略已就绪即可交互）；高模由后台 loadHigh 就绪后无感替换
-        setStatus(PERF.upgradeHigh ? '加载中（高清细节后台升级）…' : '模型已加载', 'loading');
-      } else {
-        setStatus('模型加载失败（' + device.model + ' 不存在？）', 'err');
-      }
       stopProgressAnim();
-      setLoading(false);   // 模型一就绪立即进入画面，不卡加载遮罩
+      setLoading(false);
       rendererHigh.domElement.style.cursor = '';
       state.mode = Mode.DETAIL;
       document.body.classList.add('in-detail');   // 隐藏侧栏/分享，面板独占左下角
-      // 详情模式：真正释放全景缩略模型（归还 GPU 显存）→ 详情大模型不再与全景数
-      // 百万面同驻显存，杜绝手机 WebGL 内存崩溃（此前仅 visible=false 不释放内存）
-      releaseThumbnails();
+      releaseThumbnails();   // 归还全景缩略显存
+
+      // 模型就绪后（借用=瞬时 / 下载=完成后）补充取景与状态
+      loadP.then(model => {
+        if (token !== state.enterToken) return;
+        if (model) {
+          fitDetailView(model);
+          setStatus('模型已加载', 'ok');   // 高清升级完成时 loadHigh 会再置「已加载（高清）」
+        } else {
+          setStatus('模型加载失败（' + device.model + ' 不存在？）', 'err');
+        }
+      }).catch(() => {});
       console.log('[线上展厅] 进入详情模式:', device.name);
     }
 
@@ -1399,6 +1405,7 @@
       state.enterToken++;           // 使进行中的进入流程失效
       state.mode = Mode.TRANSITION;
 
+      state.upgrading = false;   // 停止升级标记
       stopProgressAnim();   // 停止详情进度动画
       setLoading(true, '返回全景…');
       rendererHigh.domElement.style.cursor = 'wait';
