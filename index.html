@@ -362,7 +362,7 @@
 
     // 模型资源版本号：仅在模型/缩略图文件内容更新时递增！
     // 页面逻辑改动（UI/性能）不递增 → 已下载的 glb 命中浏览器缓存，避免每次改版都重下几十 MB
-    const MODEL_VER = 44;
+    const MODEL_VER = 46;
     const ver = (url) => url + (url.includes('?') ? '&' : '?') + 'v=' + MODEL_VER;
 
     function showFatal(msg) {
@@ -1390,9 +1390,10 @@
             finish(obj);
             loadHigh(true);   // 中模显示后后台升级高清（无感替换；失败保留中模不崩）
           }, e => {
-            if (e && e.total && token === state.loadToken) {
-              setProgText('加载 ' + device.name + '…');
-              setProgTarget(e.loaded / e.total);
+            // 进度显示在参数面板（dp-status），不触发全屏遮罩
+            if (e && e.total && token === state.loadToken && state.mode !== Mode.OVERVIEW) {
+              const pct = Math.round(e.loaded / e.total * 100);
+              setStatus('加载 ' + device.name + '… ' + pct + '%', 'loading');
             }
           }, () => {
             // mobile 失败 → 直接尝试高清
